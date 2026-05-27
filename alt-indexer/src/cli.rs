@@ -47,6 +47,12 @@ pub enum Command {
         /// Decode and print up to N matching card references.
         #[arg(long)]
         list: Option<usize>,
+        /// Show translated effect text instead of a table.
+        #[arg(long, default_value_t = false)]
+        show_effect: bool,
+        /// Locale key for effect translation (e.g. en_US, fr_FR).
+        #[arg(long, default_value = "en_US")]
+        locale: String,
     },
 }
 
@@ -88,11 +94,55 @@ pub fn run() -> Result<()> {
             set,
             id_gd,
             list,
+            show_effect,
+            locale,
         } => {
-            let result = query::query_id_gd(&index_dir, &set, id_gd, list)?;
-            println!("idGd {}: {} cards", result.id_gd, result.cardinality);
-            for reference in &result.references {
-                println!("  {reference}");
+            if show_effect {
+                let result = query::query_id_gd_effect_text(&index_dir, &set, id_gd, list, &locale)?;
+                println!("idGd {}: {} cards", result.id_gd, result.cardinality);
+                if !result.cards.is_empty() {
+                    println!();
+                    for card in &result.cards {
+                        println!("{}", card.reference);
+                        println!(
+                            "Cost: {} / {}          Power: O:{} / M:{} / F:{}",
+                            card.hand, card.reserve, card.o, card.m, card.f
+                        );
+                        for line in &card.effect_lines {
+                            println!("{line}");
+                        }
+                        println!("-----------------");
+                    }
+                }
+            } else {
+                let result = query::query_id_gd(&index_dir, &set, id_gd, list)?;
+                println!("idGd {}: {} cards", result.id_gd, result.cardinality);
+                if !result.rows.is_empty() {
+                    println!();
+                    println!(
+                        "{:<7}  {:<28}  {:>3} {:>3} {:>2} {:>2} {:>2}  {:<40}  {:<16}",
+                        "index", "reference", "Hc", "Rc", "M", "O", "F", "main effect", "echo effect"
+                    );
+                    println!("{}", "-".repeat(7 + 2 + 28 + 2 + 3 + 1 + 3 + 1 + 2 + 1 + 2 + 1 + 2 + 2 + 40 + 2 + 16));
+                    for row in &result.rows {
+                        println!(
+                            "{:<7}  {:<28}  {:>3} {:>3} {:>2} {:>2} {:>2}  {:<40}  {:<16}",
+                            row.card_index,
+                            row.reference,
+                            row.hand,
+                            row.reserve,
+                            row.m,
+                            row.o,
+                            row.f,
+                            row.main_effect,
+                            if row.echo_effect.is_empty() {
+                                "<none>"
+                            } else {
+                                &row.echo_effect
+                            }
+                        );
+                    }
+                }
             }
         }
     }

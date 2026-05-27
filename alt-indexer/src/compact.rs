@@ -293,3 +293,53 @@ pub fn write_compact_records(
     Ok(())
 }
 
+// --- Read-side view ---
+
+pub struct CompactCardView<'a> {
+    buf: &'a [u8; RECORD_SIZE],
+}
+
+impl<'a> CompactCardView<'a> {
+    pub fn from_data(data: &'a [u8], card_index: u32) -> Option<Self> {
+        let offset = card_index as usize * RECORD_SIZE;
+        let slice = data.get(offset..offset + RECORD_SIZE)?;
+        let buf: &[u8; RECORD_SIZE] = slice.try_into().ok()?;
+        Some(Self { buf })
+    }
+
+    pub fn faction_code(&self) -> u8 {
+        self.buf[0]
+    }
+    pub fn main_cost(&self) -> u8 {
+        self.buf[1]
+    }
+    pub fn recall_cost(&self) -> u8 {
+        self.buf[2]
+    }
+    pub fn mountain_power(&self) -> u8 {
+        self.buf[3]
+    }
+    pub fn ocean_power(&self) -> u8 {
+        self.buf[4]
+    }
+    pub fn forest_power(&self) -> u8 {
+        self.buf[5]
+    }
+
+    /// Returns the 16-bit idGd at slot idx (0..11).
+    pub fn id_gd(&self, idx: usize) -> u16 {
+        let base = 6 + idx * 2;
+        u16::from_le_bytes([self.buf[base], self.buf[base + 1]])
+    }
+
+    pub fn main_effect_group(&self, group: usize) -> [u16; 3] {
+        let base = group * 3;
+        [self.id_gd(base), self.id_gd(base + 1), self.id_gd(base + 2)]
+    }
+
+    pub fn echo_effect(&self) -> [u16; 3] {
+        [self.id_gd(9), self.id_gd(10), self.id_gd(11)]
+    }
+}
+
+

@@ -1,17 +1,17 @@
 use crate::bitmap::BitmapStore;
 use crate::card::{IdGdOccurrence, LocaleText};
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IdGdCatalog {
     pub set: String,
     pub entries: Vec<IdGdCatalogEntry>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IdGdCatalogEntry {
     pub id_gd: u32,
     pub card_count: u64,
