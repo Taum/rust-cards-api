@@ -1,0 +1,499 @@
+{
+  "cardType": {
+    "reference": "CHARACTER",
+    "translations": {
+      "es_ES": { "locale": "es_ES", "name": "Personaje" },
+      "it_IT": { "locale": "it_IT", "name": "Personaggio" },
+      "de_DE": { "locale": "de_DE", "name": "Charakter" },
+      "en_US": { "locale": "en_US", "name": "Character" },
+      "fr_FR": { "locale": "fr_FR", "name": "Personnage" }
+    },
+    "id": "01H19NWA92A4ERAC4ATMSZNASS",
+    "name": "Character"
+  },
+  "cardSubTypes": [
+    {
+      "reference": "DRAGON",
+      "id": "01HKAGQCSK17FMGRQDPCFZZ4GB",
+      "name": "Dragon"
+    },
+    {
+      "reference": "PLANT",
+      "id": "01HKAGSB49H24XWW17AAY441MT",
+      "name": "Plant"
+    }
+  ],
+  "cardSet": {
+    "id": "01HN5TWSSVYM93FHCEC3K8NNCM",
+    "reference": "COREKS",
+    "name": "Beyond the Gates - KS Edition"
+  },
+  "rarity": {
+    "reference": "UNIQUE",
+    "id": "01GE7AC9X35JXEQZJBBD6E4BKW",
+    "name": "Unique"
+  },
+  "cardElements": [
+    {
+      "cardElementType": {
+        "reference": "MAIN_COST",
+        "id": "01H3CC15HETBMNE1NJT9F5T3W9"
+      },
+      "cardEffectDisplays": [],
+      "value": "7",
+      "id": "5CFJR3YC5Q9YN8J3V2QFHS3QX7"
+    },
+    {
+      "cardElementType": {
+        "reference": "RECALL_COST",
+        "id": "01H3CC15J3R3E63842D2V8CDVA"
+      },
+      "cardEffectDisplays": [],
+      "value": "8",
+      "id": "6ASBEDHV289STVZNQX1XCDCTXS"
+    },
+    {
+      "cardElementType": {
+        "reference": "MOUNTAIN_POWER",
+        "id": "01H3CC15KVHBZQMH6P9FPQ2XC7"
+      },
+      "cardEffectDisplays": [],
+      "value": "5",
+      "id": "14M5GF6GT19X1AW0VD84B3M3ZP"
+    },
+    {
+      "cardElementType": {
+        "reference": "OCEAN_POWER",
+        "id": "01H3CC15K51PQ0XXYBAQBKFBQG"
+      },
+      "cardEffectDisplays": [],
+      "value": "0",
+      "id": "0824XE2ESZ8AXBWBJG9FCQCR2Q"
+    },
+    {
+      "cardElementType": {
+        "reference": "FOREST_POWER",
+        "id": "01H3CC15MDGJNQSNT73NNGEQSP"
+      },
+      "cardEffectDisplays": [],
+      "value": "5",
+      "id": "2QJXKAEJ269M1RCN5AGM7ZCTK6"
+    },
+    {
+      "cardElementType": {
+        "reference": "MAIN_EFFECT",
+        "id": "01H3CC15MXR9S51BVK0YFX81C1"
+      },
+      "cardEffectDisplays": [
+        {
+          "cardElement": "\/card_elements\/2MKW2M9HZ081EATVQ1MSF6ND35",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 23,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DJQ9JNGE10V8Z503SDFP"
+                  }
+                ],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              },
+              {
+                "idGd": 142,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "Ewig",
+                          "locale": "de_DE",
+                          "description": "Während der Ruhepause gehe ich nicht in die Reserve."
+                        },
+                        "en_US": {
+                          "displayWeb": "Eternal",
+                          "locale": "en_US",
+                          "description": "During Rest, I don't go to Reserve."
+                        },
+                        "es_ES": {
+                          "displayWeb": "Eterno",
+                          "locale": "es_ES",
+                          "description": "Durante el descanso, no voy a la reserva."
+                        },
+                        "it_IT": {
+                          "displayWeb": "Eterno",
+                          "locale": "it_IT",
+                          "description": "Durante il riposo, non vado nella Riserva."
+                        },
+                        "fr_FR": {
+                          "displayWeb": "Éternel",
+                          "locale": "fr_FR",
+                          "description": "Au Repos, je ne vais pas en Réserve."
+                        }
+                      },
+                      "id": "01HKAGTCZEJKRPFC0MTQHPMNJH",
+                      "reference": "ETERNAL"
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DS5256D9ZS2HVDQ3VBF4"
+                  }
+                ],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": { "text": "Je suis [ETERNAL].", "locale": "fr_FR" },
+                  "de_DE": { "text": "Ich bin [ETERNAL].", "locale": "de_DE" },
+                  "it_IT": { "text": "Ho [ETERNAL].", "locale": "it_IT" },
+                  "es_ES": { "text": "Soy [ETERNAL].", "locale": "es_ES" },
+                  "en_US": { "text": "I am [ETERNAL].", "locale": "en_US" }
+                },
+                "text": "I am [ETERNAL]."
+              },
+              {
+                "idGd": 181,
+                "cardEffectElementDisplays": [],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Si j'ai au moins 1 boost :",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Falls ich mindestens 1 Verstärkung habe:",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Se ho 1 o più rinforzi:",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Si tengo 1 potenciador o más:",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "If I have 1 or more boosts:",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "If I have 1 or more boosts:"
+              }
+            ],
+            "reference": "23_142_181"
+          },
+          "sequence": 1,
+          "id": "7G1Z63PVGW94GRKZACN6QYYE8D"
+        },
+        {
+          "cardElement": "\/card_elements\/2MKW2M9HZ081EATVQ1MSF6ND35",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 20,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "es_ES": { "text": "Al mediodía —", "locale": "es_ES" },
+                  "en_US": { "text": "At Noon —", "locale": "en_US" },
+                  "fr_FR": { "text": "À Midi —", "locale": "fr_FR" },
+                  "de_DE": { "text": "Zum Mittag —", "locale": "de_DE" },
+                  "it_IT": { "text": "A mezzogiorno —", "locale": "it_IT" }
+                },
+                "text": "At Noon —"
+              },
+              {
+                "idGd": 146,
+                "cardEffectElementDisplays": [],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Un Personnage ciblé gagne 3 boosts.",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Ein Charakter deiner Wahl erhält 3 Verstärkungen.",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Un personaggio bersaglio ottiene 3 rinforzi.",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Un personaje objetivo gana 3 potenciadores.",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "Target Character gains 3 boosts.",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "Target Character gains 3 boosts."
+              },
+              {
+                "idGd": 191,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DWZPC1Z9RKPE5KKVPBMQ"
+                  }
+                ],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              }
+            ],
+            "reference": "20_146_191"
+          },
+          "sequence": 2,
+          "id": "43JNPW1JC98ZW9ZS7X4RAQMDS2"
+        }
+      ],
+      "value": "[]If I have 1 or more boosts: I am [Eternal].  At Noon — []Target Character gains 3 boosts.",
+      "id": "2MKW2M9HZ081EATVQ1MSF6ND35"
+    },
+    {
+      "cardElementType": {
+        "reference": "ECHO_EFFECT",
+        "id": "01H3CC15N8DB3H650XME16304G"
+      },
+      "cardEffectDisplays": [
+        {
+          "cardElement": "\/card_elements\/27Q9T3KNSK9B2BF9BG9V9KK1X7",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 191,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DWZPC1Z9RKPE5KKVPBMQ"
+                  }
+                ],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              },
+              {
+                "idGd": 192,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": { "text": "{D} :", "locale": "fr_FR" },
+                  "en_US": { "text": "{D} :", "locale": "en_US" },
+                  "de_DE": { "text": "{D} :", "locale": "de_DE" },
+                  "it_IT": { "text": "{D}:", "locale": "it_IT" },
+                  "es_ES": { "text": "{D} :", "locale": "es_ES" }
+                },
+                "text": "{D} :"
+              },
+              {
+                "idGd": 245,
+                "cardEffectElementDisplays": [],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": { "text": "Piochez une carte.", "locale": "fr_FR" },
+                  "de_DE": { "text": "Ziehe eine Karte.", "locale": "de_DE" },
+                  "it_IT": { "text": "Pesca una carta.", "locale": "it_IT" },
+                  "es_ES": { "text": "Roba una carta.", "locale": "es_ES" },
+                  "en_US": { "text": "Draw a card.", "locale": "en_US" }
+                },
+                "text": "Draw a card."
+              }
+            ],
+            "reference": "191_192_245"
+          },
+          "sequence": 1,
+          "id": "5XFFQW1BQM9HKTFPP4YEA8G64V"
+        }
+      ],
+      "value": "{D} : []Draw a card.",
+      "id": "27Q9T3KNSK9B2BF9BG9V9KK1X7"
+    }
+  ],
+  "isPublic": true,
+  "serializedNumber": null,
+  "cardProduct": { "reference": "B", "name": "Booster" },
+  "illustrator": { "nickName": "Ba Vo" },
+  "imagePath": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/en_US\/8cb6e540516a4992288c5ad667db1610.jpg",
+  "assets": {
+    "WEB": [
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_MU_22\/ALT_CORE_B_MU_22_C_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_MU_22\/ALT_CORE_B_MU_22_R_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_MU_22\/ALT_CORE_B_MU_22_U_WEB.jpg"
+    ]
+  },
+  "lowerPrice": 0,
+  "qrUrlDetail": "https:\/\/qr.loc.equinox-ccg.io\/ALT_COREKS_B_MU_22_U_3140",
+  "isExclusive": false,
+  "isOwnerless": false,
+  "reference": "ALT_COREKS_B_MU_22_U_3140",
+  "translations": {
+    "fr_FR": {
+      "name": "Hydracaena",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/fr_FR\/14dff5bb410dadae7d2706ec9c9c2989.jpg",
+      "locale": "fr_FR"
+    },
+    "en_US": {
+      "name": "Hydracaena",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/en_US\/8cb6e540516a4992288c5ad667db1610.jpg",
+      "locale": "en_US"
+    },
+    "it_IT": {
+      "name": "Idracaena",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/it_IT\/36935c8858cd9433f027f3d9c53951d3.jpg",
+      "locale": "it_IT"
+    },
+    "es_ES": {
+      "name": "Hidracaena",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/es_ES\/8d30019e6b7cc2873ac60ae09741c0f2.jpg",
+      "locale": "es_ES"
+    },
+    "de_DE": {
+      "name": "Hydracaena",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/de_DE\/727232eb6dcfc6bc05be79ba14c1b57c.jpg",
+      "locale": "de_DE"
+    }
+  },
+  "id": "09G8NV3SXE88S9DC96VRPRQDXY",
+  "mainFaction": {
+    "reference": "MU",
+    "color": "#3d6b42",
+    "id": "01GE7AC9X2BNM40TTAYAEFSZSJ",
+    "name": "Muna"
+  },
+  "allImagePath": {
+    "fr-fr": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/fr_FR\/14dff5bb410dadae7d2706ec9c9c2989.jpg",
+    "en-us": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_MU_22\/UNIQUE\/JPG\/en_US\/8cb6e540516a4992288c5ad667db1610.jpg"
+  },
+  "name": "Hydracaena",
+  "elements": {
+    "MAIN_COST": "7",
+    "RECALL_COST": "8",
+    "MOUNTAIN_POWER": "5",
+    "OCEAN_POWER": "0",
+    "FOREST_POWER": "5",
+    "MAIN_EFFECT": "[]If I have 1 or more boosts: I am [Eternal].  At Noon — []Target Character gains 3 boosts.",
+    "ECHO_EFFECT": "{D} : []Draw a card."
+  },
+  "collectorNumberFormatted": "BTG-113-U-3140",
+  "isSuspended": false,
+  "isErrated": false,
+  "isBanned": false,
+  "isSerialized": false,
+  "isParentSerialized": false
+}
