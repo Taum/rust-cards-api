@@ -1,6 +1,7 @@
 use crate::bitmap::BitmapStore;
 use crate::card::parse_card_effects;
 use crate::catalog::{Catalog, CatalogBuilder};
+use crate::compact::{extract_compact_fields, write_compact_records, CompactCardFields};
 use crate::idgd_catalog::IdGdCatalogBuilder;
 use crate::crawl::{discover_card_files, DiscoverOptions};
 use crate::progress::{BuildProgress, DiscoveryProgress, WriteProgress};
@@ -53,14 +54,22 @@ pub fn build(
     let mut catalog_builder = CatalogBuilder::new(set);
     let mut bitmaps = BitmapStore::new();
     let mut idgd_catalog_builder = IdGdCatalogBuilder::new();
+    let mut compact_cards: Vec<(u32, CompactCardFields)> = Vec::with_capacity(total_files);
 
     for file in &files {
         let card_index = catalog_builder.on_card(&file.parsed)?;
+
+        // idGd bitmaps and catalog
         let occurrences = parse_card_effects(&file.path)?;
         for occ in &occurrences {
             idgd_catalog_builder.record_first(occ);
             bitmaps.insert(occ.id_gd, card_index);
         }
+
+        // compact card table
+        let compact = extract_compact_fields(&file.path, &file.parsed)?;
+        compact_cards.push((card_index, compact));
+
         progress.inc();
     }
 
@@ -77,6 +86,9 @@ pub fn build(
     let bitmap_bytes = bitmaps.write_dir(&id_gd_dir)?;
     let idgd_catalog = idgd_catalog_builder.build(set, &bitmaps, &bitmap_bytes);
     IdGdCatalogBuilder::save(&idgd_catalog, &set_out.join("idgd_catalog.json"))?;
+
+    // Write compact card table next to catalog.json
+    write_compact_records(&set_out.join("cards.bin"), catalog.total_bit_span, &compact_cards)?;
 
     let built_at_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)

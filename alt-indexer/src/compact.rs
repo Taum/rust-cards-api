@@ -1,0 +1,295 @@
+use crate::path::ParsedCardPath;
+use anyhow::{Context, Result};
+use serde::Deserialize;
+use std::fs;
+use std::path::Path;
+
+/// Fixed-size compact representation of a card, matching the 32-byte record layout.
+#[derive(Debug, Clone)]
+pub struct CompactCardFields {
+    pub faction_code: u8,           // 0..=6
+    pub main_cost: u8,              // 0..=15
+    pub recall_cost: u8,            // 0..=15
+    pub mountain_power: u8,         // 0..=15
+    pub ocean_power: u8,            // 0..=15
+    pub forest_power: u8,           // 0..=15
+    pub main_effect: [[u16; 3]; 3], // [group][T,C,O], 0..=4095
+    pub echo_effect: [u16; 3],      // [T,C,O], 0..=4095
+}
+
+pub const RECORD_SIZE: usize = 32;
+
+// --- JSON view for compact extraction ---
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardJson {
+    #[serde(default)]
+    main_faction: Option<MainFaction>,
+    #[serde(default)]
+    card_elements: Vec<CardElement>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MainFaction {
+    #[serde(default)]
+    reference: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardElement {
+    #[serde(default)]
+    card_element_type: Option<CardElementType>,
+    #[serde(default)]
+    value: Option<String>,
+    #[serde(default)]
+    card_effect_displays: Vec<CardEffectDisplay>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardElementType {
+    #[serde(default)]
+    reference: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardEffectDisplay {
+    #[serde(default)]
+    card_effect: Option<CardEffect>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardEffect {
+    #[serde(default)]
+    card_effect_elements: Vec<CardEffectElement>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CardEffectElement {
+    id_gd: u32,
+    #[serde(rename = "type")]
+    element_type: Option<String>,
+}
+
+fn read_card(path: &Path) -> Result<CardJson> {
+    let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let card: CardJson =
+        serde_json::from_str(&text).with_context(|| format!("parse JSON {}", path.display()))?;
+    Ok(card)
+}
+
+/// Extract the compact fields needed for `cards.bin` from one card JSON.
+pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Result<CompactCardFields> {
+    let card = read_card(path)?;
+
+    // Faction: prefer mainFaction.reference, fall back to path faction, then 0.
+    let faction_str = card
+        .main_faction
+        .as_ref()
+        .and_then(|mf| mf.reference.as_deref())
+        .unwrap_or(parsed_path.faction.as_str());
+
+    let faction_code = match faction_str {
+        "AX" => 1,
+        "BR" => 2,
+        "LY" => 3,
+        "MU" => 4,
+        "OR" => 5,
+        "YZ" => 6,
+        _ => 0,
+    };
+
+    // Stats: default 0, override from cardElements by cardElementType.reference
+    let mut main_cost: u8 = 0;
+    let mut recall_cost: u8 = 0;
+    let mut mountain_power: u8 = 0;
+    let mut ocean_power: u8 = 0;
+    let mut forest_power: u8 = 0;
+
+    // Effect groups
+    let mut main_effect: [[u16; 3]; 3] = [[0; 3]; 3];
+    let mut echo_effect: [u16; 3] = [0; 3];
+
+    for element in &card.card_elements {
+        let elem_type = element
+            .card_element_type
+            .as_ref()
+            .and_then(|t| t.reference.as_ref())
+            .map(String::as_str);
+
+        match elem_type {
+            Some("MAIN_COST") => {
+                if let Some(v) = &element.value {
+                    if let Ok(n) = v.parse::<u8>() {
+                        main_cost = n;
+                    }
+                }
+            }
+            Some("RECALL_COST") => {
+                if let Some(v) = &element.value {
+                    if let Ok(n) = v.parse::<u8>() {
+                        recall_cost = n;
+                    }
+                }
+            }
+            Some("MOUNTAIN_POWER") => {
+                if let Some(v) = &element.value {
+                    if let Ok(n) = v.parse::<u8>() {
+                        mountain_power = n;
+                    }
+                }
+            }
+            Some("OCEAN_POWER") => {
+                if let Some(v) = &element.value {
+                    if let Ok(n) = v.parse::<u8>() {
+                        ocean_power = n;
+                    }
+                }
+            }
+            Some("FOREST_POWER") => {
+                if let Some(v) = &element.value {
+                    if let Ok(n) = v.parse::<u8>() {
+                        forest_power = n;
+                    }
+                }
+            }
+            Some("MAIN_EFFECT") => {
+                // Up to 3 groups, each from one display, in order
+                for (group_idx, display) in element.card_effect_displays.iter().take(3).enumerate()
+                {
+                    if let Some(effect) = &display.card_effect {
+                        set_group_from_effect(&mut main_effect[group_idx], effect);
+                    }
+                }
+            }
+            Some("ECHO_EFFECT") => {
+                // Single aggregate group across all displays
+                let mut trigger: u16 = 0;
+                let mut condition: u16 = 0;
+                let mut output: u16 = 0;
+
+                for display in &element.card_effect_displays {
+                    if let Some(effect) = &display.card_effect {
+                        for node in &effect.card_effect_elements {
+                            let id = node.id_gd as u16;
+                            let kind = node
+                                .element_type
+                                .as_deref()
+                                .unwrap_or_default();
+                            match kind {
+                                "TRIGGER" if trigger == 0 => trigger = id,
+                                "CONDITION" if condition == 0 => condition = id,
+                                "OUTPUT" if output == 0 => output = id,
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                echo_effect = [trigger, condition, output];
+            }
+            _ => {}
+        }
+    }
+
+    Ok(CompactCardFields {
+        faction_code,
+        main_cost,
+        recall_cost,
+        mountain_power,
+        ocean_power,
+        forest_power,
+        main_effect,
+        echo_effect,
+    })
+}
+
+fn set_group_from_effect(slot: &mut [u16; 3], effect: &CardEffect) {
+    let mut trigger: u16 = 0;
+    let mut condition: u16 = 0;
+    let mut output: u16 = 0;
+
+    for node in &effect.card_effect_elements {
+        let id = node.id_gd as u16;
+        let kind = node.element_type.as_deref().unwrap_or_default();
+        match kind {
+            "TRIGGER" if trigger == 0 => trigger = id,
+            "CONDITION" if condition == 0 => condition = id,
+            "OUTPUT" if output == 0 => output = id,
+            _ => {}
+        }
+    }
+
+    slot[0] = trigger;
+    slot[1] = condition;
+    slot[2] = output;
+}
+
+// --- Binary encoding / writing ---
+
+pub fn encode_record(fields: &CompactCardFields) -> [u8; RECORD_SIZE] {
+    let mut buf = [0u8; RECORD_SIZE];
+
+    // Header: 6 bytes
+    buf[0] = fields.faction_code;
+    buf[1] = fields.main_cost;
+    buf[2] = fields.recall_cost;
+    buf[3] = fields.mountain_power;
+    buf[4] = fields.ocean_power;
+    buf[5] = fields.forest_power;
+
+    // idGd block: 12 × u16, little-endian
+    let ids: [u16; 12] = [
+        fields.main_effect[0][0], fields.main_effect[0][1], fields.main_effect[0][2],
+        fields.main_effect[1][0], fields.main_effect[1][1], fields.main_effect[1][2],
+        fields.main_effect[2][0], fields.main_effect[2][1], fields.main_effect[2][2],
+        fields.echo_effect[0],    fields.echo_effect[1],    fields.echo_effect[2],
+    ];
+
+    let mut offset = 6;
+    for id in ids {
+        let bytes = id.to_le_bytes();
+        buf[offset] = bytes[0];
+        buf[offset + 1] = bytes[1];
+        offset += 2;
+    }
+
+    // bytes 30–31 are reserved and remain zero
+    buf
+}
+
+pub fn write_compact_records(
+    path: &Path,
+    total_bit_span: u32,
+    cards: &[(u32, CompactCardFields)],
+) -> Result<()> {
+    use std::fs::OpenOptions;
+    use std::io::{Seek, SeekFrom, Write};
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(path)
+        .with_context(|| format!("open {}", path.display()))?;
+
+    file.set_len((total_bit_span as u64) * RECORD_SIZE as u64)
+        .with_context(|| format!("set_len {}", path.display()))?;
+
+    for (card_index, fields) in cards {
+        let offset = (*card_index as u64) * RECORD_SIZE as u64;
+        file.seek(SeekFrom::Start(offset))
+            .with_context(|| format!("seek {} to {}", path.display(), offset))?;
+        file.write_all(&encode_record(fields))
+            .with_context(|| format!("write record at {} in {}", offset, path.display()))?;
+    }
+
+    Ok(())
+}
+

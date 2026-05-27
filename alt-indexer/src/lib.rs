@@ -2,6 +2,7 @@ pub mod bitmap;
 pub mod build;
 pub mod card;
 pub mod catalog;
+pub mod compact;
 pub mod cli;
 pub mod crawl;
 pub mod decode;

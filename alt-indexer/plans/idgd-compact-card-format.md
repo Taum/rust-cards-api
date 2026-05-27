@@ -20,7 +20,12 @@ Each card is encoded to a **fixed number of bytes** so we can compute offsets as
 
 ### Faction encoding
 
-We only care about the **path faction** (`AX`, `BR`, `LY`, `MU`, `OR`, `YZ`), mapped to a small integer:
+We care about the **card’s actual faction** first, not just the path:
+
+- Primary source: `mainFaction.reference` in the JSON.
+- Fallback: the **path faction** from `ParsedCardPath.faction` if `mainFaction` is missing or invalid.
+
+We map the final faction tag to an integer:
 
 - `AX = 1`
 - `BR = 2`
@@ -29,7 +34,9 @@ We only care about the **path faction** (`AX`, `BR`, `LY`, `MU`, `OR`, `YZ`), ma
 - `OR = 5`
 - `YZ = 6`
 
-We store this as a plain `u8` in the record (value `0` reserved for “unknown/invalid”).
+and store it as a plain `u8` (value `0` reserved for “unknown/invalid or mismatch”).
+
+If `mainFaction.reference` disagrees with the path, we **trust `mainFaction`** but you can later cross-check against the path using the catalog if needed.
 
 ### Numeric stats (from `cardElements`)
 
