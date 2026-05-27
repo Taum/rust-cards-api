@@ -1,1 +1,380 @@
-{"cardType":{"reference":"CHARACTER","translations":{"es_ES":{"locale":"es_ES","name":"Personaje"},"it_IT":{"locale":"it_IT","name":"Personaggio"},"de_DE":{"locale":"de_DE","name":"Charakter"},"en_US":{"locale":"en_US","name":"Character"},"fr_FR":{"locale":"fr_FR","name":"Personnage"}},"id":"01H19NWA92A4ERAC4ATMSZNASS","name":"Character"},"cardSubTypes":[{"reference":"ENGINEER","id":"01HKAGPA9AS71JN0H9HQZTBNCD","name":"Engineer"},{"reference":"DEITY","id":"01HKAGPAJFS4YDQVKY6AB16614","name":"Deity"}],"cardSet":{"id":"01HN5TWSSVYM93FHCEC3K8NNCM","reference":"COREKS","name":"Beyond the Gates - KS Edition"},"rarity":{"reference":"UNIQUE","id":"01GE7AC9X35JXEQZJBBD6E4BKW","name":"Unique"},"cardElements":[{"cardElementType":{"reference":"MAIN_COST","id":"01H3CC15HETBMNE1NJT9F5T3W9"},"cardEffectDisplays":[],"value":"2","id":"3S81GY238T8D7AMR20PWAQZCNQ"},{"cardElementType":{"reference":"RECALL_COST","id":"01H3CC15J3R3E63842D2V8CDVA"},"cardEffectDisplays":[],"value":"2","id":"4NW7E293H18E69KTSGKAW7NDRX"},{"cardElementType":{"reference":"MOUNTAIN_POWER","id":"01H3CC15KVHBZQMH6P9FPQ2XC7"},"cardEffectDisplays":[],"value":"0","id":"0S2CHWGN1K9YWSTVEH64QZVGMN"},{"cardElementType":{"reference":"OCEAN_POWER","id":"01H3CC15K51PQ0XXYBAQBKFBQG"},"cardEffectDisplays":[],"value":"2","id":"2S8NFF0KF99X99KKJGW6BH4M59"},{"cardElementType":{"reference":"FOREST_POWER","id":"01H3CC15MDGJNQSNT73NNGEQSP"},"cardEffectDisplays":[],"value":"0","id":"14KBC51HY08W2VCCE1HV33W9MG"},{"cardElementType":{"reference":"MAIN_EFFECT","id":"01H3CC15MXR9S51BVK0YFX81C1"},"cardEffectDisplays":[{"cardElement":"\/card_elements\/6CCBGHSKBA8SJSHSX3VEAC1FM9","cardEffect":{"cardEffectElements":[{"idGd":24,"cardEffectElementDisplays":[],"type":"TRIGGER","translations":{"fr_FR":{"text":"{J}","locale":"fr_FR"},"de_DE":{"text":"{J}","locale":"de_DE"},"it_IT":{"text":"{J}","locale":"it_IT"},"es_ES":{"text":"{J}","locale":"es_ES"},"en_US":{"text":"{J}","locale":"en_US"}},"text":"{J}"},{"idGd":76,"cardEffectElementDisplays":[],"type":"OUTPUT","translations":{"fr_FR":{"text":"Chaque Robot que vous contrôlez autre que moi gagne 1 boost.","locale":"fr_FR"},"de_DE":{"text":"Jeder Roboter, den du außer mir selbst kontrollierst, erhält 1 Verstärkung.","locale":"de_DE"},"it_IT":{"text":"Ogni Robot che controlli eccetto me ottiene 1 rinforzo.","locale":"it_IT"},"es_ES":{"text":"Cada robot que controles aparte de mí gana 1 potenciador.","locale":"es_ES"},"en_US":{"text":"Each Robot you control other than me gains 1 boost.","locale":"en_US"}},"text":"Each Robot you control other than me gains 1 boost."},{"idGd":191,"cardEffectElementDisplays":[{"cardKeyword":{"translations":{"de_DE":{"displayWeb":"","locale":"de_DE","description":""},"fr_FR":{"displayWeb":"","locale":"fr_FR","description":""},"it_IT":{"displayWeb":"","locale":"it_IT","description":""},"es_ES":{"displayWeb":"","locale":"es_ES","description":""},"en_US":{"displayWeb":"","locale":"en_US","description":""}},"id":"01HQN1DJPSN331RMWE8DVH9KE1","reference":""},"sequence":0,"isDescriptionDisplayed":false,"id":"01HQN1DWZPC1Z9RKPE5KKVPBMQ"}],"type":"CONDITION","translations":{"fr_FR":{"text":"[]","locale":"fr_FR"},"de_DE":{"text":"[]","locale":"de_DE"},"it_IT":{"text":"[]","locale":"it_IT"},"es_ES":{"text":"[]","locale":"es_ES"},"en_US":{"text":"[]","locale":"en_US"}},"text":"[]"}],"reference":"24_76_191"},"sequence":1,"id":"5JX4V6GR228E5BWF1MJGBKWSQ3"},{"cardElement":"\/card_elements\/6CCBGHSKBA8SJSHSX3VEAC1FM9","cardEffect":{"cardEffectElements":[{"idGd":24,"cardEffectElementDisplays":[],"type":"TRIGGER","translations":{"fr_FR":{"text":"{J}","locale":"fr_FR"},"de_DE":{"text":"{J}","locale":"de_DE"},"it_IT":{"text":"{J}","locale":"it_IT"},"es_ES":{"text":"{J}","locale":"es_ES"},"en_US":{"text":"{J}","locale":"en_US"}},"text":"{J}"},{"idGd":70,"cardEffectElementDisplays":[{"cardKeyword":{"translations":{"en_US":{"displayWeb":"Fleeting","locale":"en_US","description":"Send me to Discard instead of Reserve after my effect resolves."},"de_DE":{"displayWeb":"Vergänglich","locale":"de_DE","description":"Lege mich auf die Ablage statt in die Reserve, nachdem mein Effekt abgeklungen ist."},"it_IT":{"displayWeb":"Fugace","locale":"it_IT","description":"Mandami negli Scarti invece che nella Riserva dopo che il mio effetto si è risolto."},"es_ES":{"displayWeb":"Fugacidad","locale":"es_ES","description":"Una vez resuelto mi efecto, envíame a la pila de descartes en lugar de a la reserva."},"fr_FR":{"displayWeb":"Fugace","locale":"fr_FR","description":"Envoyez-moi à la Défausse plutôt qu'en Réserve une fois mon effet résolu."}},"id":"01HKAGPHBY4EPW8TR9VTCHZG5Q","reference":"FLEETING"},"sequence":0,"isDescriptionDisplayed":false,"id":"01HQN1DN4HS4ME5PACT2DPWTDP"}],"type":"OUTPUT","translations":{"de_DE":{"text":"Du darfst einen Charakter wählen, er erhält [FLEETING].","locale":"de_DE"},"it_IT":{"text":"Puoi scegliere come bersaglio un personaggio e fargli ottenere [FLEETING].","locale":"it_IT"},"es_ES":{"text":"Puedes hacer objetivo a un personaje. Gana [FLEETING].","locale":"es_ES"},"fr_FR":{"text":"Vous pouvez cibler un Personnage. Il gagne [FLEETING].","locale":"fr_FR"},"en_US":{"text":"You may target a Character, it gains [FLEETING].","locale":"en_US"}},"text":"You may target a Character, it gains [FLEETING]."},{"idGd":171,"cardEffectElementDisplays":[],"type":"CONDITION","translations":{"fr_FR":{"text":"Vous pouvez mettre une carte de votre main en Réserve. Si c'est un Permanent :","locale":"fr_FR"},"de_DE":{"text":"Du darfst eine Karte aus deiner Hand in die Reserve legen. Falls sie eine Bleibende Karte ist:","locale":"de_DE"},"it_IT":{"text":"Puoi mettere una carta dalla tua mano nella Riserva. Se è un permanente:","locale":"it_IT"},"es_ES":{"text":"Puedes colocar una carta de tu mano en la reserva. Si es un permanente:","locale":"es_ES"},"en_US":{"text":"You may put a card from your hand in Reserve. If it's a Permanent:","locale":"en_US"}},"text":"You may put a card from your hand in Reserve. If it's a Permanent:"}],"reference":"24_70_171"},"sequence":2,"id":"0SSVMTPPDC8RXV1Y6XMKKBKBED"}],"value":"{J} []Each Robot you control other than me gains 1 boost.  {J} You may put a card from your hand in Reserve. If it's a Permanent: You may target a Character, it gains [[Fleeting]].","id":"6CCBGHSKBA8SJSHSX3VEAC1FM9"}],"isPublic":false,"serializedNumber":null,"cardProduct":{"reference":"B","name":"Booster"},"illustrator":{"nickName":"Edward Cheekokseang"},"imagePath":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg","assets":{"WEB":["https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_C_WEB.jpg","https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_R_WEB.jpg","https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_U_WEB.jpg"]},"lowerPrice":0,"qrUrlDetail":"https:\/\/qr.loc.equinox-ccg.io\/ALT_COREKS_B_AX_06_U_5","isExclusive":false,"isOwnerless":false,"reference":"ALT_COREKS_B_AX_06_U_5","translations":{"en_US":{"name":"Ogun","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg","locale":"en_US"},"es_ES":{"name":"Ogun","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/es_ES\/7d13e004178c15cac1800e008c108db7.jpg","locale":"es_ES"},"it_IT":{"name":"Ogun","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/it_IT\/67bdb1cd3d0498d45f752775e036c35b.jpg","locale":"it_IT"},"de_DE":{"name":"Ogun","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/de_DE\/15ff7f8c9610006b8375a58d83177f69.jpg","locale":"de_DE"},"fr_FR":{"name":"Ogun","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/fr_FR\/eacd32f336bbc7cf3b3b78bb6eae5a38.jpg","locale":"fr_FR"}},"id":"4SG5WXFWRQ8RCRJXB89REA9G7K","mainFaction":{"reference":"AX","color":"#8c432a","id":"01GE7AC9XBG707G19F03A95TH1","name":"Axiom"},"allImagePath":{"fr-fr":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/fr_FR\/eacd32f336bbc7cf3b3b78bb6eae5a38.jpg","en-us":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg"},"name":"Ogun","elements":{"MAIN_COST":"2","RECALL_COST":"2","MOUNTAIN_POWER":"0","OCEAN_POWER":"2","FOREST_POWER":"0","MAIN_EFFECT":"{J} []Each Robot you control other than me gains 1 boost.  {J} You may put a card from your hand in Reserve. If it's a Permanent: You may target a Character, it gains [[Fleeting]]."},"collectorNumberFormatted":"BTG-011-U-5","isSuspended":false,"isErrated":false,"isBanned":false,"isSerialized":false,"isParentSerialized":false}
+{
+  "cardType": {
+    "reference": "CHARACTER",
+    "translations": {
+      "es_ES": { "locale": "es_ES", "name": "Personaje" },
+      "it_IT": { "locale": "it_IT", "name": "Personaggio" },
+      "de_DE": { "locale": "de_DE", "name": "Charakter" },
+      "en_US": { "locale": "en_US", "name": "Character" },
+      "fr_FR": { "locale": "fr_FR", "name": "Personnage" }
+    },
+    "id": "01H19NWA92A4ERAC4ATMSZNASS",
+    "name": "Character"
+  },
+  "cardSubTypes": [
+    {
+      "reference": "ENGINEER",
+      "id": "01HKAGPA9AS71JN0H9HQZTBNCD",
+      "name": "Engineer"
+    },
+    {
+      "reference": "DEITY",
+      "id": "01HKAGPAJFS4YDQVKY6AB16614",
+      "name": "Deity"
+    }
+  ],
+  "cardSet": {
+    "id": "01HN5TWSSVYM93FHCEC3K8NNCM",
+    "reference": "COREKS",
+    "name": "Beyond the Gates - KS Edition"
+  },
+  "rarity": {
+    "reference": "UNIQUE",
+    "id": "01GE7AC9X35JXEQZJBBD6E4BKW",
+    "name": "Unique"
+  },
+  "cardElements": [
+    {
+      "cardElementType": {
+        "reference": "MAIN_COST",
+        "id": "01H3CC15HETBMNE1NJT9F5T3W9"
+      },
+      "cardEffectDisplays": [],
+      "value": "2",
+      "id": "3S81GY238T8D7AMR20PWAQZCNQ"
+    },
+    {
+      "cardElementType": {
+        "reference": "RECALL_COST",
+        "id": "01H3CC15J3R3E63842D2V8CDVA"
+      },
+      "cardEffectDisplays": [],
+      "value": "2",
+      "id": "4NW7E293H18E69KTSGKAW7NDRX"
+    },
+    {
+      "cardElementType": {
+        "reference": "MOUNTAIN_POWER",
+        "id": "01H3CC15KVHBZQMH6P9FPQ2XC7"
+      },
+      "cardEffectDisplays": [],
+      "value": "0",
+      "id": "0S2CHWGN1K9YWSTVEH64QZVGMN"
+    },
+    {
+      "cardElementType": {
+        "reference": "OCEAN_POWER",
+        "id": "01H3CC15K51PQ0XXYBAQBKFBQG"
+      },
+      "cardEffectDisplays": [],
+      "value": "2",
+      "id": "2S8NFF0KF99X99KKJGW6BH4M59"
+    },
+    {
+      "cardElementType": {
+        "reference": "FOREST_POWER",
+        "id": "01H3CC15MDGJNQSNT73NNGEQSP"
+      },
+      "cardEffectDisplays": [],
+      "value": "0",
+      "id": "14KBC51HY08W2VCCE1HV33W9MG"
+    },
+    {
+      "cardElementType": {
+        "reference": "MAIN_EFFECT",
+        "id": "01H3CC15MXR9S51BVK0YFX81C1"
+      },
+      "cardEffectDisplays": [
+        {
+          "cardElement": "\/card_elements\/6CCBGHSKBA8SJSHSX3VEAC1FM9",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 24,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": { "text": "{J}", "locale": "fr_FR" },
+                  "de_DE": { "text": "{J}", "locale": "de_DE" },
+                  "it_IT": { "text": "{J}", "locale": "it_IT" },
+                  "es_ES": { "text": "{J}", "locale": "es_ES" },
+                  "en_US": { "text": "{J}", "locale": "en_US" }
+                },
+                "text": "{J}"
+              },
+              {
+                "idGd": 76,
+                "cardEffectElementDisplays": [],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Chaque Robot que vous contrôlez autre que moi gagne 1 boost.",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Jeder Roboter, den du außer mir selbst kontrollierst, erhält 1 Verstärkung.",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Ogni Robot che controlli eccetto me ottiene 1 rinforzo.",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Cada robot que controles aparte de mí gana 1 potenciador.",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "Each Robot you control other than me gains 1 boost.",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "Each Robot you control other than me gains 1 boost."
+              },
+              {
+                "idGd": 191,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DWZPC1Z9RKPE5KKVPBMQ"
+                  }
+                ],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              }
+            ],
+            "reference": "24_76_191"
+          },
+          "sequence": 1,
+          "id": "5JX4V6GR228E5BWF1MJGBKWSQ3"
+        },
+        {
+          "cardElement": "\/card_elements\/6CCBGHSKBA8SJSHSX3VEAC1FM9",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 24,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": { "text": "{J}", "locale": "fr_FR" },
+                  "de_DE": { "text": "{J}", "locale": "de_DE" },
+                  "it_IT": { "text": "{J}", "locale": "it_IT" },
+                  "es_ES": { "text": "{J}", "locale": "es_ES" },
+                  "en_US": { "text": "{J}", "locale": "en_US" }
+                },
+                "text": "{J}"
+              },
+              {
+                "idGd": 70,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "en_US": {
+                          "displayWeb": "Fleeting",
+                          "locale": "en_US",
+                          "description": "Send me to Discard instead of Reserve after my effect resolves."
+                        },
+                        "de_DE": {
+                          "displayWeb": "Vergänglich",
+                          "locale": "de_DE",
+                          "description": "Lege mich auf die Ablage statt in die Reserve, nachdem mein Effekt abgeklungen ist."
+                        },
+                        "it_IT": {
+                          "displayWeb": "Fugace",
+                          "locale": "it_IT",
+                          "description": "Mandami negli Scarti invece che nella Riserva dopo che il mio effetto si è risolto."
+                        },
+                        "es_ES": {
+                          "displayWeb": "Fugacidad",
+                          "locale": "es_ES",
+                          "description": "Una vez resuelto mi efecto, envíame a la pila de descartes en lugar de a la reserva."
+                        },
+                        "fr_FR": {
+                          "displayWeb": "Fugace",
+                          "locale": "fr_FR",
+                          "description": "Envoyez-moi à la Défausse plutôt qu'en Réserve une fois mon effet résolu."
+                        }
+                      },
+                      "id": "01HKAGPHBY4EPW8TR9VTCHZG5Q",
+                      "reference": "FLEETING"
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DN4HS4ME5PACT2DPWTDP"
+                  }
+                ],
+                "type": "OUTPUT",
+                "translations": {
+                  "de_DE": {
+                    "text": "Du darfst einen Charakter wählen, er erhält [FLEETING].",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Puoi scegliere come bersaglio un personaggio e fargli ottenere [FLEETING].",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Puedes hacer objetivo a un personaje. Gana [FLEETING].",
+                    "locale": "es_ES"
+                  },
+                  "fr_FR": {
+                    "text": "Vous pouvez cibler un Personnage. Il gagne [FLEETING].",
+                    "locale": "fr_FR"
+                  },
+                  "en_US": {
+                    "text": "You may target a Character, it gains [FLEETING].",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "You may target a Character, it gains [FLEETING]."
+              },
+              {
+                "idGd": 171,
+                "cardEffectElementDisplays": [],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Vous pouvez mettre une carte de votre main en Réserve. Si c'est un Permanent :",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Du darfst eine Karte aus deiner Hand in die Reserve legen. Falls sie eine Bleibende Karte ist:",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Puoi mettere una carta dalla tua mano nella Riserva. Se è un permanente:",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Puedes colocar una carta de tu mano en la reserva. Si es un permanente:",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "You may put a card from your hand in Reserve. If it's a Permanent:",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "You may put a card from your hand in Reserve. If it's a Permanent:"
+              }
+            ],
+            "reference": "24_70_171"
+          },
+          "sequence": 2,
+          "id": "0SSVMTPPDC8RXV1Y6XMKKBKBED"
+        }
+      ],
+      "value": "{J} []Each Robot you control other than me gains 1 boost.  {J} You may put a card from your hand in Reserve. If it's a Permanent: You may target a Character, it gains [[Fleeting]].",
+      "id": "6CCBGHSKBA8SJSHSX3VEAC1FM9"
+    }
+  ],
+  "isPublic": false,
+  "serializedNumber": null,
+  "cardProduct": { "reference": "B", "name": "Booster" },
+  "illustrator": { "nickName": "Edward Cheekokseang" },
+  "imagePath": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg",
+  "assets": {
+    "WEB": [
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_C_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_R_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_AX_06\/ALT_CORE_B_AX_06_U_WEB.jpg"
+    ]
+  },
+  "lowerPrice": 0,
+  "qrUrlDetail": "https:\/\/qr.loc.equinox-ccg.io\/ALT_COREKS_B_AX_06_U_5",
+  "isExclusive": false,
+  "isOwnerless": false,
+  "reference": "ALT_COREKS_B_AX_06_U_5",
+  "translations": {
+    "en_US": {
+      "name": "Ogun",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg",
+      "locale": "en_US"
+    },
+    "es_ES": {
+      "name": "Ogun",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/es_ES\/7d13e004178c15cac1800e008c108db7.jpg",
+      "locale": "es_ES"
+    },
+    "it_IT": {
+      "name": "Ogun",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/it_IT\/67bdb1cd3d0498d45f752775e036c35b.jpg",
+      "locale": "it_IT"
+    },
+    "de_DE": {
+      "name": "Ogun",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/de_DE\/15ff7f8c9610006b8375a58d83177f69.jpg",
+      "locale": "de_DE"
+    },
+    "fr_FR": {
+      "name": "Ogun",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/fr_FR\/eacd32f336bbc7cf3b3b78bb6eae5a38.jpg",
+      "locale": "fr_FR"
+    }
+  },
+  "id": "4SG5WXFWRQ8RCRJXB89REA9G7K",
+  "mainFaction": {
+    "reference": "AX",
+    "color": "#8c432a",
+    "id": "01GE7AC9XBG707G19F03A95TH1",
+    "name": "Axiom"
+  },
+  "allImagePath": {
+    "fr-fr": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/fr_FR\/eacd32f336bbc7cf3b3b78bb6eae5a38.jpg",
+    "en-us": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_AX_06\/UNIQUE\/JPG\/en_US\/27856caa5febfd4702d68606a4f7b649.jpg"
+  },
+  "name": "Ogun",
+  "elements": {
+    "MAIN_COST": "2",
+    "RECALL_COST": "2",
+    "MOUNTAIN_POWER": "0",
+    "OCEAN_POWER": "2",
+    "FOREST_POWER": "0",
+    "MAIN_EFFECT": "{J} []Each Robot you control other than me gains 1 boost.  {J} You may put a card from your hand in Reserve. If it's a Permanent: You may target a Character, it gains [[Fleeting]]."
+  },
+  "collectorNumberFormatted": "BTG-011-U-5",
+  "isSuspended": false,
+  "isErrated": false,
+  "isBanned": false,
+  "isSerialized": false,
+  "isParentSerialized": false
+}

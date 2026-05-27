@@ -1,1 +1,371 @@
-{"cardType":{"reference":"CHARACTER","translations":{"es_ES":{"locale":"es_ES","name":"Personaje"},"it_IT":{"locale":"it_IT","name":"Personaggio"},"de_DE":{"locale":"de_DE","name":"Charakter"},"en_US":{"locale":"en_US","name":"Character"},"fr_FR":{"locale":"fr_FR","name":"Personnage"}},"id":"01H19NWA92A4ERAC4ATMSZNASS","name":"Character"},"cardSubTypes":[{"reference":"BUREAUCRAT","id":"01HKAGVBV23NSWD6EXJXSKK3F8","name":"Bureaucrat"}],"cardSet":{"id":"01HN5TWSSVYM93FHCEC3K8NNCM","reference":"COREKS","name":"Beyond the Gates - KS Edition"},"rarity":{"reference":"UNIQUE","id":"01GE7AC9X35JXEQZJBBD6E4BKW","name":"Unique"},"cardElements":[{"cardElementType":{"reference":"MAIN_COST","id":"01H3CC15HETBMNE1NJT9F5T3W9"},"cardEffectDisplays":[],"value":"3","id":"40QADR22GK9S8SJX32E0S5KXKP"},{"cardElementType":{"reference":"RECALL_COST","id":"01H3CC15J3R3E63842D2V8CDVA"},"cardEffectDisplays":[],"value":"3","id":"0Q70ZES2598DGBQCDMDYF0MATZ"},{"cardElementType":{"reference":"MOUNTAIN_POWER","id":"01H3CC15KVHBZQMH6P9FPQ2XC7"},"cardEffectDisplays":[],"value":"3","id":"35YVWR14XK8NG9XVSY9PY8QRGY"},{"cardElementType":{"reference":"OCEAN_POWER","id":"01H3CC15K51PQ0XXYBAQBKFBQG"},"cardEffectDisplays":[],"value":"3","id":"1JT1ZYMYVV8HPBFKG191ENWW2V"},{"cardElementType":{"reference":"FOREST_POWER","id":"01H3CC15MDGJNQSNT73NNGEQSP"},"cardEffectDisplays":[],"value":"3","id":"4A448QS6308XXTFMZAGR7ZY4Z6"},{"cardElementType":{"reference":"MAIN_EFFECT","id":"01H3CC15MXR9S51BVK0YFX81C1"},"cardEffectDisplays":[{"cardElement":"\/card_elements\/7966DR4Q8V99YA352S4WRZB6ES","cardEffect":{"cardEffectElements":[{"idGd":90,"cardEffectElementDisplays":[],"type":"OUTPUT","translations":{"fr_FR":{"text":"Piochez une carte.","locale":"fr_FR"},"de_DE":{"text":"Ziehe eine Karte.","locale":"de_DE"},"it_IT":{"text":"Pesca una carta.","locale":"it_IT"},"es_ES":{"text":"Roba una carta.","locale":"es_ES"},"en_US":{"text":"Draw a card.","locale":"en_US"}},"text":"Draw a card."},{"idGd":191,"cardEffectElementDisplays":[{"cardKeyword":{"translations":{"de_DE":{"displayWeb":"","locale":"de_DE","description":""},"fr_FR":{"displayWeb":"","locale":"fr_FR","description":""},"it_IT":{"displayWeb":"","locale":"it_IT","description":""},"es_ES":{"displayWeb":"","locale":"es_ES","description":""},"en_US":{"displayWeb":"","locale":"en_US","description":""}},"id":"01HQN1DJPSN331RMWE8DVH9KE1","reference":""},"sequence":0,"isDescriptionDisplayed":false,"id":"01HQN1DWZPC1Z9RKPE5KKVPBMQ"}],"type":"CONDITION","translations":{"fr_FR":{"text":"[]","locale":"fr_FR"},"de_DE":{"text":"[]","locale":"de_DE"},"it_IT":{"text":"[]","locale":"it_IT"},"es_ES":{"text":"[]","locale":"es_ES"},"en_US":{"text":"[]","locale":"en_US"}},"text":"[]"},{"idGd":236,"cardEffectElementDisplays":[],"type":"TRIGGER","translations":{"fr_FR":{"text":"Lorsque mon Expédition échoue à avancer pendant le Crépuscule — Au Repos :","locale":"fr_FR"},"de_DE":{"text":"Wenn meine Expedition sich am Abend nicht vorwärts bewegt — Nach der Ruhepause:","locale":"de_DE"},"it_IT":{"text":"Quando la mia spedizione non avanza durante il crepuscolo — Dopo il riposo:","locale":"it_IT"},"es_ES":{"text":"Cuando mi expedición no logre avanzar durante el anochecer — Tras el descanso:","locale":"es_ES"},"en_US":{"text":"When my Expedition fails to move forward during Dusk — After Rest:","locale":"en_US"}},"text":"When my Expedition fails to move forward during Dusk — After Rest:"}],"reference":"90_191_236"},"sequence":1,"id":"78PX40GVPQ9XJ8HD8MCD7GJ8C8"}],"value":"When my Expedition fails to move forward during Dusk — After Rest: []Draw a card.","id":"7966DR4Q8V99YA352S4WRZB6ES"},{"cardElementType":{"reference":"ECHO_EFFECT","id":"01H3CC15N8DB3H650XME16304G"},"cardEffectDisplays":[{"cardElement":"\/card_elements\/04PK22ER6G9A6BR91CJP2TYP38","cardEffect":{"cardEffectElements":[{"idGd":59,"cardEffectElementDisplays":[],"type":"OUTPUT","translations":{"fr_FR":{"text":"Payez {1} de moins pour le prochain Sort que vous jouez cet Après-midi.","locale":"fr_FR"},"de_DE":{"text":"Zahle {1} weniger für den nächsten Zauber, den du an diesem Nachmittag spielst.","locale":"de_DE"},"it_IT":{"text":"Paga {1} in meno per il prossimo incantesimo che giochi questo pomeriggio.","locale":"it_IT"},"es_ES":{"text":"Paga {1} menos por el siguiente hechizo que juegues esta tarde.","locale":"es_ES"},"en_US":{"text":"Pay {1} less for the next Spell you play this Afternoon.","locale":"en_US"}},"text":"Pay {1} less for the next Spell you play this Afternoon."},{"idGd":191,"cardEffectElementDisplays":[{"cardKeyword":{"translations":{"de_DE":{"displayWeb":"","locale":"de_DE","description":""},"fr_FR":{"displayWeb":"","locale":"fr_FR","description":""},"it_IT":{"displayWeb":"","locale":"it_IT","description":""},"es_ES":{"displayWeb":"","locale":"es_ES","description":""},"en_US":{"displayWeb":"","locale":"en_US","description":""}},"id":"01HQN1DJPSN331RMWE8DVH9KE1","reference":""},"sequence":0,"isDescriptionDisplayed":false,"id":"01HQN1DWZPC1Z9RKPE5KKVPBMQ"}],"type":"CONDITION","translations":{"fr_FR":{"text":"[]","locale":"fr_FR"},"de_DE":{"text":"[]","locale":"de_DE"},"it_IT":{"text":"[]","locale":"it_IT"},"es_ES":{"text":"[]","locale":"es_ES"},"en_US":{"text":"[]","locale":"en_US"}},"text":"[]"},{"idGd":192,"cardEffectElementDisplays":[],"type":"TRIGGER","translations":{"fr_FR":{"text":"{D} :","locale":"fr_FR"},"en_US":{"text":"{D} :","locale":"en_US"},"de_DE":{"text":"{D} :","locale":"de_DE"},"it_IT":{"text":"{D}:","locale":"it_IT"},"es_ES":{"text":"{D} :","locale":"es_ES"}},"text":"{D} :"}],"reference":"59_191_192"},"sequence":1,"id":"589PT9YSWM9J7SHF22NR3A1EKH"}],"value":"{D} : []Pay {1} less for the next Spell you play this Afternoon.","id":"04PK22ER6G9A6BR91CJP2TYP38"}],"isPublic":true,"serializedNumber":null,"cardProduct":{"reference":"B","name":"Booster"},"illustrator":{"nickName":"Nestor Papatriantafyllou"},"imagePath":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg","assets":{"WEB":["https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_C_WEB.jpg","https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_R_WEB.jpg","https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_U_WEB.jpg"]},"lowerPrice":0,"qrUrlDetail":"https:\/\/qr.loc.equinox-ccg.io\/ALT_COREKS_B_OR_16_U_6","isExclusive":false,"isOwnerless":false,"reference":"ALT_COREKS_B_OR_16_U_6","translations":{"fr_FR":{"name":"Procuratrice Ordis","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/fr_FR\/a09cb63d73a66e63e17cb60486dfd13a.jpg","locale":"fr_FR"},"en_US":{"name":"Ordis Attorney","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg","locale":"en_US"},"de_DE":{"name":"Ordis-Anwältin","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/de_DE\/8455a728edad6687fa1d2347c406c4c4.jpg","locale":"de_DE"},"es_ES":{"name":"Abogada de Ordis","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/es_ES\/3693350f2964c22251d8f7ab53009fcb.jpg","locale":"es_ES"},"it_IT":{"name":"Avvocata Ordis","image":"Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/it_IT\/a55a3c402180b01e0ec0a727881901cf.jpg","locale":"it_IT"}},"id":"2S8TSQY0FN9418BA3CW09FMJBV","mainFaction":{"reference":"YZ","color":"#764891","id":"01GE7AC9WEQKW1Y1BF8SCY7459","name":"Yzmir"},"allImagePath":{"fr-fr":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/fr_FR\/a09cb63d73a66e63e17cb60486dfd13a.jpg","en-us":"https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg"},"name":"Ordis Attorney","elements":{"MAIN_COST":"3","RECALL_COST":"3","MOUNTAIN_POWER":"3","OCEAN_POWER":"3","FOREST_POWER":"3","MAIN_EFFECT":"When my Expedition fails to move forward during Dusk — After Rest: []Draw a card.","ECHO_EFFECT":"{D} : []Pay {1} less for the next Spell you play this Afternoon."},"collectorNumberFormatted":"BTG-134-U-6","isSuspended":false,"isErrated":false,"isBanned":false,"isSerialized":false,"isParentSerialized":false}
+{
+  "cardType": {
+    "reference": "CHARACTER",
+    "translations": {
+      "es_ES": { "locale": "es_ES", "name": "Personaje" },
+      "it_IT": { "locale": "it_IT", "name": "Personaggio" },
+      "de_DE": { "locale": "de_DE", "name": "Charakter" },
+      "en_US": { "locale": "en_US", "name": "Character" },
+      "fr_FR": { "locale": "fr_FR", "name": "Personnage" }
+    },
+    "id": "01H19NWA92A4ERAC4ATMSZNASS",
+    "name": "Character"
+  },
+  "cardSubTypes": [
+    {
+      "reference": "BUREAUCRAT",
+      "id": "01HKAGVBV23NSWD6EXJXSKK3F8",
+      "name": "Bureaucrat"
+    }
+  ],
+  "cardSet": {
+    "id": "01HN5TWSSVYM93FHCEC3K8NNCM",
+    "reference": "COREKS",
+    "name": "Beyond the Gates - KS Edition"
+  },
+  "rarity": {
+    "reference": "UNIQUE",
+    "id": "01GE7AC9X35JXEQZJBBD6E4BKW",
+    "name": "Unique"
+  },
+  "cardElements": [
+    {
+      "cardElementType": {
+        "reference": "MAIN_COST",
+        "id": "01H3CC15HETBMNE1NJT9F5T3W9"
+      },
+      "cardEffectDisplays": [],
+      "value": "3",
+      "id": "40QADR22GK9S8SJX32E0S5KXKP"
+    },
+    {
+      "cardElementType": {
+        "reference": "RECALL_COST",
+        "id": "01H3CC15J3R3E63842D2V8CDVA"
+      },
+      "cardEffectDisplays": [],
+      "value": "3",
+      "id": "0Q70ZES2598DGBQCDMDYF0MATZ"
+    },
+    {
+      "cardElementType": {
+        "reference": "MOUNTAIN_POWER",
+        "id": "01H3CC15KVHBZQMH6P9FPQ2XC7"
+      },
+      "cardEffectDisplays": [],
+      "value": "3",
+      "id": "35YVWR14XK8NG9XVSY9PY8QRGY"
+    },
+    {
+      "cardElementType": {
+        "reference": "OCEAN_POWER",
+        "id": "01H3CC15K51PQ0XXYBAQBKFBQG"
+      },
+      "cardEffectDisplays": [],
+      "value": "3",
+      "id": "1JT1ZYMYVV8HPBFKG191ENWW2V"
+    },
+    {
+      "cardElementType": {
+        "reference": "FOREST_POWER",
+        "id": "01H3CC15MDGJNQSNT73NNGEQSP"
+      },
+      "cardEffectDisplays": [],
+      "value": "3",
+      "id": "4A448QS6308XXTFMZAGR7ZY4Z6"
+    },
+    {
+      "cardElementType": {
+        "reference": "MAIN_EFFECT",
+        "id": "01H3CC15MXR9S51BVK0YFX81C1"
+      },
+      "cardEffectDisplays": [
+        {
+          "cardElement": "\/card_elements\/7966DR4Q8V99YA352S4WRZB6ES",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 90,
+                "cardEffectElementDisplays": [],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": { "text": "Piochez une carte.", "locale": "fr_FR" },
+                  "de_DE": { "text": "Ziehe eine Karte.", "locale": "de_DE" },
+                  "it_IT": { "text": "Pesca una carta.", "locale": "it_IT" },
+                  "es_ES": { "text": "Roba una carta.", "locale": "es_ES" },
+                  "en_US": { "text": "Draw a card.", "locale": "en_US" }
+                },
+                "text": "Draw a card."
+              },
+              {
+                "idGd": 191,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DWZPC1Z9RKPE5KKVPBMQ"
+                  }
+                ],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              },
+              {
+                "idGd": 236,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Lorsque mon Expédition échoue à avancer pendant le Crépuscule — Au Repos :",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Wenn meine Expedition sich am Abend nicht vorwärts bewegt — Nach der Ruhepause:",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Quando la mia spedizione non avanza durante il crepuscolo — Dopo il riposo:",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Cuando mi expedición no logre avanzar durante el anochecer — Tras el descanso:",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "When my Expedition fails to move forward during Dusk — After Rest:",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "When my Expedition fails to move forward during Dusk — After Rest:"
+              }
+            ],
+            "reference": "90_191_236"
+          },
+          "sequence": 1,
+          "id": "78PX40GVPQ9XJ8HD8MCD7GJ8C8"
+        }
+      ],
+      "value": "When my Expedition fails to move forward during Dusk — After Rest: []Draw a card.",
+      "id": "7966DR4Q8V99YA352S4WRZB6ES"
+    },
+    {
+      "cardElementType": {
+        "reference": "ECHO_EFFECT",
+        "id": "01H3CC15N8DB3H650XME16304G"
+      },
+      "cardEffectDisplays": [
+        {
+          "cardElement": "\/card_elements\/04PK22ER6G9A6BR91CJP2TYP38",
+          "cardEffect": {
+            "cardEffectElements": [
+              {
+                "idGd": 59,
+                "cardEffectElementDisplays": [],
+                "type": "OUTPUT",
+                "translations": {
+                  "fr_FR": {
+                    "text": "Payez {1} de moins pour le prochain Sort que vous jouez cet Après-midi.",
+                    "locale": "fr_FR"
+                  },
+                  "de_DE": {
+                    "text": "Zahle {1} weniger für den nächsten Zauber, den du an diesem Nachmittag spielst.",
+                    "locale": "de_DE"
+                  },
+                  "it_IT": {
+                    "text": "Paga {1} in meno per il prossimo incantesimo che giochi questo pomeriggio.",
+                    "locale": "it_IT"
+                  },
+                  "es_ES": {
+                    "text": "Paga {1} menos por el siguiente hechizo que juegues esta tarde.",
+                    "locale": "es_ES"
+                  },
+                  "en_US": {
+                    "text": "Pay {1} less for the next Spell you play this Afternoon.",
+                    "locale": "en_US"
+                  }
+                },
+                "text": "Pay {1} less for the next Spell you play this Afternoon."
+              },
+              {
+                "idGd": 191,
+                "cardEffectElementDisplays": [
+                  {
+                    "cardKeyword": {
+                      "translations": {
+                        "de_DE": {
+                          "displayWeb": "",
+                          "locale": "de_DE",
+                          "description": ""
+                        },
+                        "fr_FR": {
+                          "displayWeb": "",
+                          "locale": "fr_FR",
+                          "description": ""
+                        },
+                        "it_IT": {
+                          "displayWeb": "",
+                          "locale": "it_IT",
+                          "description": ""
+                        },
+                        "es_ES": {
+                          "displayWeb": "",
+                          "locale": "es_ES",
+                          "description": ""
+                        },
+                        "en_US": {
+                          "displayWeb": "",
+                          "locale": "en_US",
+                          "description": ""
+                        }
+                      },
+                      "id": "01HQN1DJPSN331RMWE8DVH9KE1",
+                      "reference": ""
+                    },
+                    "sequence": 0,
+                    "isDescriptionDisplayed": false,
+                    "id": "01HQN1DWZPC1Z9RKPE5KKVPBMQ"
+                  }
+                ],
+                "type": "CONDITION",
+                "translations": {
+                  "fr_FR": { "text": "[]", "locale": "fr_FR" },
+                  "de_DE": { "text": "[]", "locale": "de_DE" },
+                  "it_IT": { "text": "[]", "locale": "it_IT" },
+                  "es_ES": { "text": "[]", "locale": "es_ES" },
+                  "en_US": { "text": "[]", "locale": "en_US" }
+                },
+                "text": "[]"
+              },
+              {
+                "idGd": 192,
+                "cardEffectElementDisplays": [],
+                "type": "TRIGGER",
+                "translations": {
+                  "fr_FR": { "text": "{D} :", "locale": "fr_FR" },
+                  "en_US": { "text": "{D} :", "locale": "en_US" },
+                  "de_DE": { "text": "{D} :", "locale": "de_DE" },
+                  "it_IT": { "text": "{D}:", "locale": "it_IT" },
+                  "es_ES": { "text": "{D} :", "locale": "es_ES" }
+                },
+                "text": "{D} :"
+              }
+            ],
+            "reference": "59_191_192"
+          },
+          "sequence": 1,
+          "id": "589PT9YSWM9J7SHF22NR3A1EKH"
+        }
+      ],
+      "value": "{D} : []Pay {1} less for the next Spell you play this Afternoon.",
+      "id": "04PK22ER6G9A6BR91CJP2TYP38"
+    }
+  ],
+  "isPublic": true,
+  "serializedNumber": null,
+  "cardProduct": { "reference": "B", "name": "Booster" },
+  "illustrator": { "nickName": "Nestor Papatriantafyllou" },
+  "imagePath": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg",
+  "assets": {
+    "WEB": [
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_C_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_R_WEB.jpg",
+      "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/CORE\/CARDS\/ALT_CORE_B_OR_16\/ALT_CORE_B_OR_16_U_WEB.jpg"
+    ]
+  },
+  "lowerPrice": 0,
+  "qrUrlDetail": "https:\/\/qr.loc.equinox-ccg.io\/ALT_COREKS_B_OR_16_U_6",
+  "isExclusive": false,
+  "isOwnerless": false,
+  "reference": "ALT_COREKS_B_OR_16_U_6",
+  "translations": {
+    "fr_FR": {
+      "name": "Procuratrice Ordis",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/fr_FR\/a09cb63d73a66e63e17cb60486dfd13a.jpg",
+      "locale": "fr_FR"
+    },
+    "en_US": {
+      "name": "Ordis Attorney",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg",
+      "locale": "en_US"
+    },
+    "de_DE": {
+      "name": "Ordis-Anwältin",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/de_DE\/8455a728edad6687fa1d2347c406c4c4.jpg",
+      "locale": "de_DE"
+    },
+    "es_ES": {
+      "name": "Abogada de Ordis",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/es_ES\/3693350f2964c22251d8f7ab53009fcb.jpg",
+      "locale": "es_ES"
+    },
+    "it_IT": {
+      "name": "Avvocata Ordis",
+      "image": "Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/it_IT\/a55a3c402180b01e0ec0a727881901cf.jpg",
+      "locale": "it_IT"
+    }
+  },
+  "id": "2S8TSQY0FN9418BA3CW09FMJBV",
+  "mainFaction": {
+    "reference": "YZ",
+    "color": "#764891",
+    "id": "01GE7AC9WEQKW1Y1BF8SCY7459",
+    "name": "Yzmir"
+  },
+  "allImagePath": {
+    "fr-fr": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/fr_FR\/a09cb63d73a66e63e17cb60486dfd13a.jpg",
+    "en-us": "https:\/\/altered-dev.s3.eu-west-3.amazonaws.com\/Art\/COREKS\/CARDS\/ALT_CORE_B_OR_16\/UNIQUE\/JPG\/en_US\/9d5caf9abd7d02e567626fbb2d786a8b.jpg"
+  },
+  "name": "Ordis Attorney",
+  "elements": {
+    "MAIN_COST": "3",
+    "RECALL_COST": "3",
+    "MOUNTAIN_POWER": "3",
+    "OCEAN_POWER": "3",
+    "FOREST_POWER": "3",
+    "MAIN_EFFECT": "When my Expedition fails to move forward during Dusk — After Rest: []Draw a card.",
+    "ECHO_EFFECT": "{D} : []Pay {1} less for the next Spell you play this Afternoon."
+  },
+  "collectorNumberFormatted": "BTG-134-U-6",
+  "isSuspended": false,
+  "isErrated": false,
+  "isBanned": false,
+  "isSerialized": false,
+  "isParentSerialized": false
+}
