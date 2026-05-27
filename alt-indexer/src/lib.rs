@@ -10,3 +10,4 @@ pub mod idgd_catalog;
 pub mod path;
 pub mod progress;
 pub mod query;
+pub mod stat_index;

@@ -3,6 +3,7 @@ use crate::card::parse_card_effects;
 use crate::catalog::{Catalog, CatalogBuilder};
 use crate::compact::{extract_compact_fields, write_compact_records, CompactCardFields};
 use crate::idgd_catalog::IdGdCatalogBuilder;
+use crate::stat_index::{StatIndex, StatIndexBuilder};
 use crate::crawl::{discover_card_files, DiscoverOptions};
 use crate::progress::{BuildProgress, DiscoveryProgress, WriteProgress};
 use anyhow::Result;
@@ -55,6 +56,7 @@ pub fn build(
     let mut bitmaps = BitmapStore::new();
     let mut idgd_catalog_builder = IdGdCatalogBuilder::new();
     let mut compact_cards: Vec<(u32, CompactCardFields)> = Vec::with_capacity(total_files);
+    let mut stat_index = StatIndexBuilder::new();
 
     for file in &files {
         let card_index = catalog_builder.on_card(&file.parsed)?;
@@ -66,8 +68,9 @@ pub fn build(
             bitmaps.insert(occ.id_gd, card_index);
         }
 
-        // compact card table
+        // compact card table + stat bitmaps
         let compact = extract_compact_fields(&file.path, &file.parsed)?;
+        stat_index.insert(card_index, &compact);
         compact_cards.push((card_index, compact));
 
         progress.inc();
@@ -89,6 +92,13 @@ pub fn build(
 
     // Write compact card table next to catalog.json
     write_compact_records(&set_out.join("cards.bin"), catalog.total_bit_span, &compact_cards)?;
+
+    let stat_index = stat_index.into_index();
+    let stats_dir = set_out.join("stats");
+    stat_index.write_dir(&stats_dir)?;
+    let stats_summary =
+        stat_index.build_summary(set, catalog.total_cards_indexed());
+    StatIndex::save_summary(&stats_summary, &set_out.join("stats_summary.json"))?;
 
     let built_at_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)

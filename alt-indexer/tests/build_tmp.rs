@@ -69,4 +69,35 @@ fn build_query_decode_tmp_fixtures() {
     assert_eq!(sample["card_count"].as_u64(), Some(1));
     assert!(sample["bitmap_bytes"].as_u64().unwrap_or(0) > 0);
     assert!(sample["translations"]["en_US"]["text"].is_string());
+
+    let stats_summary_path = summary.output_dir.join("stats_summary.json");
+    assert!(stats_summary_path.is_file(), "stats_summary.json missing");
+    let stats_text = fs::read_to_string(&stats_summary_path).expect("stats summary");
+    let stats: serde_json::Value = serde_json::from_str(&stats_text).expect("parse stats summary");
+    assert_eq!(stats["version"].as_u64(), Some(1));
+    assert_eq!(stats["total_cards_indexed"].as_u64(), Some(3));
+
+    let main_cost = stats["fields"]
+        .as_array()
+        .expect("fields")
+        .iter()
+        .find(|f| f["field"].as_str() == Some("main_cost"))
+        .expect("main_cost field");
+    let counts = main_cost["counts"].as_array().expect("counts");
+    assert_eq!(counts[2].as_u64(), Some(1)); // AX_06 U_5
+    assert_eq!(counts[3].as_u64(), Some(1)); // OR_16 U_6
+    assert_eq!(counts[7].as_u64(), Some(1)); // MU_22 U_3140
+
+    assert!(
+        summary
+            .output_dir
+            .join("stats/main_cost/02.roar")
+            .is_file()
+    );
+    assert!(
+        summary
+            .output_dir
+            .join("stats/main_cost/07.roar")
+            .is_file()
+    );
 }
