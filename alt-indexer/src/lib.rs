@@ -1,5 +1,6 @@
 pub mod bitmap;
 pub mod build;
+pub mod bench_query;
 pub mod card;
 pub mod catalog;
 pub mod compact;

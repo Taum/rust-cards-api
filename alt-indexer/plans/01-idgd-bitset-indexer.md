@@ -288,7 +288,7 @@ src/
 ## Testing Strategy
 
 - **Unit tests**: `card_index = start_bit + UniqueID - 1`, decode with variable `maxUniqueID`, gap leaves bit unset
-- **Fixtures**: `tmp/` sample files
+- **Fixtures**: `tests/card-json/` sample files
 - **Integration** (local): subtree of `cards-unique-COREKS`
 
 ## Open Questions

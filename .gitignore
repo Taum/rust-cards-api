@@ -11,3 +11,4 @@ alt-indexer/target
 alt-indexer/out_index
 alt-indexer/full_index
 alt-indexer/test_index
+alt-indexer/tmp-scripts

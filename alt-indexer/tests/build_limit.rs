@@ -6,7 +6,7 @@ fn setup_many_files(count: usize) -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_path_buf();
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let source = manifest.join("tmp/ALT_COREKS_B_AX_06_U_5.json");
+    let source = manifest.join("tests/card-json/ALT_COREKS_B_AX_06_U_5.json");
 
     for i in 1..=count {
         let dest_dir = root.join("json").join("COREKS").join("AX").join("06");

@@ -1,10 +1,33 @@
 use crate::build;
+use crate::bench_query;
 use crate::decode;
 use crate::merge;
 use crate::query;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+
+fn parse_multi_ids_range(s: &str) -> Result<(usize, usize), String> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 2 {
+        return Err("expected MIN-MAX (e.g. 6-12)".to_string());
+    }
+    let min: usize = parts[0]
+        .trim()
+        .parse()
+        .map_err(|_| "MIN must be a positive integer".to_string())?;
+    let max: usize = parts[1]
+        .trim()
+        .parse()
+        .map_err(|_| "MAX must be a positive integer".to_string())?;
+    if min == 0 || max == 0 {
+        return Err("MIN and MAX must be >= 1".to_string());
+    }
+    if min > max {
+        return Err("MIN must be <= MAX".to_string());
+    }
+    Ok((min, max))
+}
 
 #[derive(Parser)]
 #[command(name = "alt-indexer", about = "Index card JSON by idGd into Roaring bitmaps")]
@@ -46,8 +69,9 @@ pub enum Command {
         index_dir: PathBuf,
         #[arg(long)]
         set: String,
-        #[arg(long)]
-        id_gd: u32,
+        /// Comma-separated list of idGd values (e.g. `--id-gd 24,191,76`).
+        #[arg(long, value_delimiter = ',')]
+        id_gd: Vec<u32>,
         /// Decode and print up to N matching card references.
         #[arg(long)]
         list: Option<usize>,
@@ -69,6 +93,33 @@ pub enum Command {
         /// Full output directory for merged index (files written directly under this folder).
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Benchmark random idGd queries against an existing index (preloads bitmaps + cards.bin).
+    BenchQuery {
+        #[arg(long)]
+        index_dir: PathBuf,
+        #[arg(long)]
+        set: String,
+        /// Number of timed queries to run.
+        #[arg(long, default_value_t = 5000)]
+        queries: usize,
+        /// Simulate multi-id queries by picking K ids per query (K is random in MIN-MAX),
+        /// then doing (TRIGGER union) ∩ (CONDITION union) ∩ (OUTPUT union) (skipping empty groups).
+        /// Example: `--multi-ids 6-12`.
+        #[arg(long, value_parser = parse_multi_ids_range)]
+        multi_ids: Option<(usize, usize)>,
+        /// RNG seed (deterministic). If omitted, a default constant is used.
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Warmup iterations (executed but not recorded).
+        #[arg(long, default_value_t = 200)]
+        warmup: usize,
+        /// Optional machine-readable JSON output path.
+        #[arg(long)]
+        json_out: Option<PathBuf>,
+        /// Print first N sampled queries (sanity check; adds output noise).
+        #[arg(long)]
+        print_samples: Option<usize>,
     },
 }
 
@@ -123,8 +174,15 @@ pub fn run() -> Result<()> {
             locale,
         } => {
             if show_effect {
-                let result = query::query_id_gd_effect_text(&index_dir, &set, id_gd, list, &locale)?;
-                println!("idGd {}: {} cards", result.id_gd, result.cardinality);
+                let result =
+                    query::query_id_gds_effect_text(&index_dir, &set, &id_gd, list, &locale)?;
+                println!("query: {} cards", result.cardinality);
+                if !result.recap_lines.is_empty() {
+                    println!();
+                    for line in &result.recap_lines {
+                        println!("{line}");
+                    }
+                }
                 if !result.cards.is_empty() {
                     println!();
                     for card in &result.cards {
@@ -140,8 +198,8 @@ pub fn run() -> Result<()> {
                     }
                 }
             } else {
-                let result = query::query_id_gd(&index_dir, &set, id_gd, list)?;
-                println!("idGd {}: {} cards", result.id_gd, result.cardinality);
+                let result = query::query_id_gds(&index_dir, &set, &id_gd, list)?;
+                println!("query: {} cards", result.cardinality);
                 if !result.rows.is_empty() {
                     println!();
                     println!(
@@ -185,6 +243,29 @@ pub fn run() -> Result<()> {
                 summary.id_gd_count,
                 summary.total_bit_span
             );
+        }
+        Command::BenchQuery {
+            index_dir,
+            set,
+            queries,
+            multi_ids,
+            seed,
+            warmup,
+            json_out,
+            print_samples,
+        } => {
+            bench_query::run(
+                &index_dir,
+                &set,
+                bench_query::BenchOptions {
+                    queries,
+                    seed,
+                    warmup,
+                    multi_ids,
+                    json_out,
+                    print_samples,
+                },
+            )?;
         }
     }
     Ok(())

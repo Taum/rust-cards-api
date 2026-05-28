@@ -22,7 +22,7 @@ fn setup_fixture_dataset() -> (tempfile::TempDir, PathBuf) {
             .join(faction)
             .join(family);
         fs::create_dir_all(&dest_dir).expect("mkdir");
-        fs::copy(manifest.join("tmp").join(file), dest_dir.join(file)).expect("copy");
+        fs::copy(manifest.join("tests/card-json").join(file), dest_dir.join(file)).expect("copy");
     }
 
     (dir, root)
