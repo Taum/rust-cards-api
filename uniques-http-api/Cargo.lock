@@ -1970,6 +1970,7 @@ dependencies = [
  "testcontainers-modules",
  "tokio",
  "tower",
+ "url",
  "uuid",
 ]
 
