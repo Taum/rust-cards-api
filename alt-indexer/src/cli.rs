@@ -1,5 +1,6 @@
 use crate::build;
 use crate::decode;
+use crate::merge;
 use crate::query;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -56,6 +57,18 @@ pub enum Command {
         /// Locale key for effect translation (e.g. en_US, fr_FR).
         #[arg(long, default_value = "en_US")]
         locale: String,
+    },
+    /// Merge multiple existing per-SET indexes into one merged index.
+    Merge {
+        /// Directory containing per-SET folders, e.g. `<index-dir>/<SET>/catalog.json`.
+        #[arg(long)]
+        index_dir: PathBuf,
+        /// Comma-separated list of SET codes in precedence order (used for overlap grouping and tie-breaking).
+        #[arg(long)]
+        sets: String,
+        /// Full output directory for merged index (files written directly under this folder).
+        #[arg(long)]
+        out: PathBuf,
     },
 }
 
@@ -156,6 +169,22 @@ pub fn run() -> Result<()> {
                     }
                 }
             }
+        }
+        Command::Merge {
+            index_dir,
+            sets,
+            out,
+        } => {
+            let summary = merge::merge_indexes(&index_dir, &sets, &out)?;
+            println!(
+                "merged {}: {} source sets, {} cards, {} families, {} idGd bitmaps, bit span {}",
+                summary.output_dir.display(),
+                summary.source_sets.len(),
+                summary.card_count,
+                summary.family_count,
+                summary.id_gd_count,
+                summary.total_bit_span
+            );
         }
     }
     Ok(())

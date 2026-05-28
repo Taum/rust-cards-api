@@ -19,6 +19,11 @@ pub struct FamilyEntry {
     pub faction: String,
     pub family_number: String,
     pub family_id: String,
+    /// Source SET code for this family when produced by `merge`.
+    ///
+    /// For normal `build` outputs, this is absent and the catalog `set` is used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_set: Option<String>,
     pub max_unique_id: u32,
     pub card_count: u32,
     pub first_reference: String,
@@ -120,6 +125,7 @@ impl CatalogBuilder {
                 faction: c.faction.clone(),
                 family_number: c.family_number.clone(),
                 family_id: c.family_id,
+                source_set: None,
                 max_unique_id: c.max_unique_id,
                 card_count: c.card_count,
                 first_reference,
@@ -173,10 +179,11 @@ impl Catalog {
             );
         }
 
+        let set = family.source_set.as_deref().unwrap_or(&self.set);
         Ok(DecodedCard {
             reference: format!(
                 "ALT_{}_B_{}_{}_U_{}",
-                self.set, family.faction, family.family_number, unique_id
+                set, family.faction, family.family_number, unique_id
             ),
             unique_id,
             family_id: family.family_id.clone(),

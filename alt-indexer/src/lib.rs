@@ -13,3 +13,4 @@ pub mod progress;
 pub mod query;
 pub mod faction_index;
 pub mod stat_index;
+pub mod merge;

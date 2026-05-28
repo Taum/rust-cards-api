@@ -4,7 +4,10 @@
 
 Add an `alt-indexer merge` step that takes **two or more existing per-SET indexes** (produced by `build`) and writes **one new index** whose on-disk layout matches a normal SET index (same files as `build` writes under `<out>/<SET>/`, but written **directly** under `--out`). The merged index is a single **global card universe**: every card from every source set appears exactly once, with stable `card_index` values suitable for Roaring bitmaps, `cards.bin`, stats, and factions.
 
-The user chooses **which source sets to include** and **in what order sets are ordered within each `familyId`**. Cards are laid out in the merged bit space by **`familyId` → set → UniqueID**, so the same `familyId` across expansions (e.g. `AX_04` in CORE and COREKS) forms one contiguous bloc in every bitmap and in `catalog.json`. Set order affects placement inside that bloc, not membership.
+The user chooses **which source sets to include** and in what order they are listed in `--sets`. The merge operation uses that order but only performs **family-level interleaving when sets actually overlap** on `family_id`.
+
+- **Overlapping sets**: if two or more sets share at least one `family_id`, those sets are merged into an “overlap group”, and within that group cards are laid out by **`familyId` → set → UniqueID**.
+- **Non-overlapping sets**: sets that share **no** `family_id` with prior sets are kept as **whole-set blocks** in `--sets` order (so they can be appended quickly without per-bit remapping).
 
 ## Motivation
 
@@ -28,7 +31,7 @@ Merge is **offline composition of indexes** — it does not re-walk JSON and doe
 ```text
 alt-indexer merge
   --index-dir <parent>     # directory containing per-SET folders (e.g. ./full_index)
-  --sets <ORDERED_LIST>    # comma-separated SET codes; order = set precedence within each familyId
+  --sets <ORDERED_LIST>    # comma-separated SET codes; order controls overlap grouping + within-group precedence
   --out <output-dir>       # full path to the merged index root (e.g. ./merged_index/COREKS_CORE)
 ```
 
@@ -50,7 +53,7 @@ Unlike `build --out`, which is a **parent** directory (`build` creates `<out>/<S
 | Flag | Required | Meaning |
 |------|----------|---------|
 | `--index-dir` | yes | Root that contains `<SET>/catalog.json` for each source |
-| `--sets` | yes | Ordered list of source SET codes; **within each `familyId`, earlier sets occupy lower `card_index` ranges** |
+| `--sets` | yes | Ordered list of source SET codes. **Sets are grouped by detected `family_id` overlap**; within an overlap group, earlier sets occupy lower `card_index` ranges for the same `familyId`. |
 | `--out` | yes | Output directory for the merged index (created if missing; all artifacts written here) |
 
 **`catalog.set` / `manifest.set`:** derived from the **last path component** of `--out` (e.g. `--out ./merged_index/ALL` → `ALL`). This matches how `build` names the SET from `--set` and keeps `query --index-dir ./merged_index --set ALL` working.
@@ -75,15 +78,39 @@ Fail fast on missing inputs, SET name mismatch, or `total_bit_span` / `cards.bin
 
 ## Ordering semantics
 
-Merged `card_index` values are **not** “all of set A, then all of set B”. They follow a global sort so each **`familyId` is one contiguous bloc** across all source sets, with sets interleaved inside that bloc.
+Merged `card_index` ordering is **hybrid**:
 
-### Sort key
+- Within sets that overlap (share at least one `family_id`), families are interleaved to form contiguous `familyId` blocs.
+- Between sets (or set-groups) that do not overlap, we keep whole-set blocks in `--sets` order.
 
-For every card in every source index, the merged position is determined by:
+This matches the intended layout example:
+
+```text
+--sets COREKS,CORE,ALIZE,BISE
+
+COREKS+CORE AX ; COREKS+CORE BR ; COREKS+CORE LY ; ... ; COREKS+CORE YZ ;
+ALIZE AX ; ALIZE BR ; ALIZE LY ; ... ; ALIZE YZ ;
+BISE AX ; BISE BR ; ... ; BISE YZ
+```
+
+### Step 1: build overlap groups (no hard-coded set names)
+
+Compute each set’s `family_id` set from its `catalog.json`. Walk sets in `--sets` order and build contiguous groups:
+
+- Start a new group with the first set.
+- For each next set `S`:
+  - If `S` shares **any** `family_id` with **any set already in the current group**, add `S` to the current group.
+  - Otherwise, close the current group and start a new group with `S`.
+
+This naturally groups COREKS+CORE if they overlap, without hard-coding either name. If ALIZE shares no family IDs with COREKS or CORE, it begins a new group.
+
+### Step 2: layout inside an overlap group
+
+Within a single overlap group, the merged position is determined by:
 
 ```text
 1. familyId     (e.g. AX_04 — faction + familyNumber; same string as catalog family_id, without SET)
-2. source set   (order given by --sets: S₀, then S₁, …)
+2. source set   (order given by --sets, restricted to sets in this group)
 3. UniqueID     (1 .. max_unique_id within that source family; gaps preserved)
 ```
 
@@ -94,13 +121,13 @@ merged_card_index = block_start(family_id, source_set) + (source_card_index - so
                   = block_start(family_id, source_set) + (UniqueID - 1)
 ```
 
-`block_start` is assigned by walking **sorted `familyId` keys**, then **sets in `--sets` order**, appending each source family’s `max_unique_id` span (same slot count as in the source catalog, including padding for missing UniqueIDs).
+`block_start` is assigned by walking **sorted `familyId` keys**, then **sets in `--sets` order (within the overlap group)**, appending each source family’s `max_unique_id` span (same slot count as in the source catalog, including padding for missing UniqueIDs).
 
 ### Why interleave by `familyId`
 
 Expansions such as CORE and COREKS reuse the same path-level `familyId` values (`AX_04`, `AX_05`, …). Concatenating whole sets would separate shared families by hundreds of thousands of bits. Interleaving keeps **all prints of one family together**, which matches how designers think about families and keeps cross-set queries/locality aligned with `familyId`.
 
-### Example (`--sets COREKS,CORE`)
+### Example (`--sets COREKS,CORE`) within one overlap group
 
 Abbreviated reference sequence in merged bit order:
 
@@ -151,23 +178,30 @@ flowchart TB
   K2 --> C2
 ```
 
-### Remap table (implementation)
+### Remap table + fast-path (implementation)
 
-Before writing outputs, build `remap: HashMap<(source_set, source_card_index), merged_card_index>` (or a per-source `Vec<u32>` parallel to each source’s `total_bit_span`):
+Before writing outputs, build either:
+
+- a full `remap[set][old_card_index] -> merged_card_index`, **or**
+- a set of **piecewise mappings** (fewer allocations) that can be applied per bitmap / per `cards.bin` region.
+
+Algorithm:
 
 1. Load all source `catalog.json` files.
-2. Collect every source `FamilyEntry` with its `source_set` (= manifest set name).
-3. Group entries by `family_id`; sort group keys by faction + `family_number`.
-4. `next_bit = 0`. For each `family_id` in order, for each `S` in `--sets` order:
-   - If source `S` has a family row for this `family_id`, set `block_start(S, family_id) = next_bit`, then `next_bit += max_unique_id` (use the source row’s span, not `card_count`).
-5. For each source family row, for `u` in `1..=max_unique_id`:  
-   `remap[S][start_bit + u - 1] = block_start(S, family_id) + u - 1` (only where the source had a set bit / record is optional for padding slots).
+2. Build overlap groups as described above.
+3. `next_bit = 0`.
+4. For each group, in group order:
+   - **If group has 1 set** (non-overlapping with anything adjacent): this group is a whole-set block. It can be placed at `base = next_bit` with a simple offset mapping:
+     - `merged_card_index = base + source_card_index`
+     - then `next_bit += catalog.total_bit_span`
+   - **If group has 2+ sets**: build `block_start(set, family_id)` by walking sorted `familyId` keys and then sets (in `--sets` order within the group), appending each present source family’s `max_unique_id` span. From that, derive `remap` for indexes in those sets:
+     - for each source family row and `u in 1..=max_unique_id`:
+       `remap[set][source_family.start_bit + u - 1] = block_start(set, family_id) + u - 1`
+     - advance `next_bit` by the group’s total span.
 
-All Roaring bitmaps, `cards.bin`, `stats/`, and `factions/` use this remap when combining sources.
+All Roaring bitmaps, `cards.bin`, `stats/`, and `factions/` use either the full remap or the fast-path “add base offset” mapping depending on which group the source set belongs to.
 
-**`--sets` order only affects numbering inside each `familyId`**, not membership. Reordering `--sets` permutes set sub-ranges within each family bloc.
-
-**`total_bit_span`** = sum of all source `total_bit_span` values (same as concatenating spans; only the arrangement changes).
+**Performance note:** yes—when sets don’t overlap, this is faster because most work becomes *bulk copy + bulk bitmap shift*, avoiding per-bit remapping across large universes. Only the overlap groups pay the per-family/per-bit remap cost.
 
 ## Output layout
 
@@ -195,13 +229,13 @@ Identical to a normal `build` output ([stats-indexer.md](stats-indexer.md), [idg
 
 - **`set`**: basename of `--out` (e.g. `COREKS_CORE`), not any single source name.
 - **`faction_order`**: unchanged global order (`AX → … → YZ`); same as single-set builds.
-- **`families`**: one row per **(source set, family)** that exists in any input, emitted in **merged walk order** (`familyId` sort, then `--sets` order):
+- **`families`**: one row per **(source SET, family_id)** that exists in any input, emitted in **merged walk order** (group order, `familyId` sort within overlap groups, then `--sets` order within the group):
   - `start_bit` = `block_start(source_set, family_id)` from the remap plan above
-  - `source_set` = source manifest set name (e.g. `COREKS`, `CORE`)
+  - `source_set` = source SET code from that input index (e.g. `COREKS`, `CORE`)
   - `faction`, `family_number`, `family_id`, `max_unique_id`, `card_count`, `first_reference` copied from that source’s family row
 - **`total_bit_span`**: `next_bit` after the walk (equals sum of source spans).
 
-Multiple rows may share the same `family_id` (different `source_set`); they appear **back-to-back** inside the global `familyId` bloc. `decode_bit` uses `source_set` to build `ALT_{source_set}_B_{faction}_{familyNumber}_U_{uniqueId}`.
+Multiple rows may share the same `family_id` (different `source_set`); they appear **back-to-back** inside that `familyId` bloc. This is required for lossless decode: when a `family_id` spans multiple sets, it must produce **one catalog entry per SET** so that bit → exact `ALT_<SET>_…` reference is unambiguous.
 
 **Schema extension (required):** `source_set` on each `FamilyEntry` (always set for merge output).
 
