@@ -15,3 +15,4 @@ alt-indexer/tmp-scripts
 
 uniques-http-api/.env.local
 uniques-http-api/target_test
+uniques-http-api/target-test

@@ -1,0 +1,10 @@
+**/target/**
+**/.git/**
+**/.cursor/**
+**/flycheck*
+**/*.rmeta
+**/*.rlib
+**/*.d
+**/*.pdb
+**/*.exe
+**/.env.local*

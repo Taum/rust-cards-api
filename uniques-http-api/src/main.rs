@@ -15,8 +15,16 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(load_index(Path::new(&index_path))?);
     let app = app(state);
 
-    let listener = TcpListener::bind("0.0.0.0:8234").await?;
-    println!("Server started successfully at 0.0.0.0:8234");
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .map(|v| v.parse::<u16>().context("PORT must be a valid u16 integer"))
+        .transpose()?
+        .unwrap_or(8080);
+
+    let addr = format!("0.0.0.0:{port}");
+    let listener = TcpListener::bind(&addr).await?;
+    println!("Server started successfully at {addr}");
     axum::serve(listener, app).await?;
     Ok(())
 }
