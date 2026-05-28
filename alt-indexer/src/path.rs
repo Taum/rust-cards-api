@@ -9,7 +9,7 @@ static CARD_FILE_RE: OnceLock<regex::Regex> = OnceLock::new();
 fn card_file_re() -> &'static regex::Regex {
     CARD_FILE_RE.get_or_init(|| {
         regex::Regex::new(
-            r"^ALT_(?P<set>[^_]+(?:_[^_]+)*)_B_(?P<faction>[A-Z]{2})_(?P<family>\d{2})_U_(?P<uid>\d+)\.json$",
+            r"^ALT_(?P<set>[^_]+(?:_[^_]+)*)_B_(?P<faction>[A-Z]{2})_(?P<family>\d+)_U_(?P<uid>\d+)\.json$",
         )
         .expect("card file regex")
     })
@@ -145,6 +145,16 @@ mod tests {
         assert_eq!(parsed.family_number, "06");
         assert_eq!(parsed.unique_id, 5);
         assert_eq!(parsed.reference(), "ALT_COREKS_B_AX_06_U_5");
+    }
+
+    #[test]
+    fn parse_three_digit_family() {
+        let path = Path::new("json/COREKS/AX/101/ALT_COREKS_B_AX_101_U_5.json");
+        let parsed = parse_card_path(path, "COREKS").unwrap();
+        assert_eq!(parsed.faction, "AX");
+        assert_eq!(parsed.family_number, "101");
+        assert_eq!(parsed.unique_id, 5);
+        assert_eq!(parsed.reference(), "ALT_COREKS_B_AX_101_U_5");
     }
 
     #[test]

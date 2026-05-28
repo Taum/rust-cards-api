@@ -5,3 +5,4 @@
 .\target\release\alt-indexer.exe build --root "..\..\equinox-cards\cards-unique-CYCLONE" --set CYCLONE --out ./full_index --profile
 .\target\release\alt-indexer.exe build --root "..\..\equinox-cards\cards-unique-DUSTER" --set DUSTER --out ./full_index --profile
 .\target\release\alt-indexer.exe build --root "..\..\equinox-cards\cards-unique-EOLE" --set EOLE --out ./full_index --profile
+.\target\release\alt-indexer.exe merge --index-dir ./full_index --sets COREKS,CORE,ALIZE,BISE,CYCLONE,DUSTER,EOLE --out ./full_index/ALL_SETS
