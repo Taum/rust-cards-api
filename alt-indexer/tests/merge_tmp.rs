@@ -74,6 +74,13 @@ fn make_set_index(root: &Path, set: &str, families: &[(&str, &str, u32)], idgd_b
     for (id, bits) in idgd_bits {
         write_bitmap(&set_dir.join("id_gd").join(format!("{id}.roar")), bits);
     }
+    // Add one per-line bitmap (m1) for the first idGd to ensure merge propagates it.
+    if let Some((id, bits)) = idgd_bits.first() {
+        write_bitmap(
+            &set_dir.join("id_gd").join(format!("{id}_m1.roar")),
+            bits,
+        );
+    }
 
     // Minimal idgd_catalog.json (merge only needs metadata; merge recomputes card_count/bytes).
     write_json(
@@ -86,7 +93,8 @@ fn make_set_index(root: &Path, set: &str, families: &[(&str, &str, u32)], idgd_b
             "bitmap_bytes": 0,
             "bitmap_file": format!("{id}.roar"),
             "element_type": "TRIGGER",
-            "translations": {}
+            "translations": {},
+            "m1": { "card_count": 0, "bitmap_bytes": 0, "bitmap_file": format!("{id}_m1.roar") }
           })).collect::<Vec<_>>()
         }),
     );
@@ -130,5 +138,15 @@ fn merge_overlap_group_interleaves_families_and_preserves_set_for_decode() {
     assert!(bmp.contains(3));
     assert!(bmp.contains(7));
     assert_eq!(bmp.len(), 3);
+
+    // Per-line bitmap should also be merged (we wrote 90_m1.roar for each source with same bits).
+    let bmp_m1 = {
+        let bytes = fs::read(out.join("id_gd/90_m1.roar")).expect("read merged roar m1");
+        RoaringBitmap::deserialize_from(&bytes[..]).expect("deserialize m1")
+    };
+    assert!(bmp_m1.contains(0));
+    assert!(bmp_m1.contains(3));
+    assert!(bmp_m1.contains(7));
+    assert_eq!(bmp_m1.len(), 3);
 }
 

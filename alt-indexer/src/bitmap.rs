@@ -9,6 +9,31 @@ pub struct BitmapStore {
     map: BTreeMap<u32, RoaringBitmap>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EffectLine {
+    M1,
+    M2,
+    M3,
+    Ec,
+}
+
+impl EffectLine {
+    pub const ALL: [EffectLine; 4] = [EffectLine::M1, EffectLine::M2, EffectLine::M3, EffectLine::Ec];
+
+    pub fn suffix(self) -> &'static str {
+        match self {
+            EffectLine::M1 => "m1",
+            EffectLine::M2 => "m2",
+            EffectLine::M3 => "m3",
+            EffectLine::Ec => "ec",
+        }
+    }
+}
+
+pub struct PerLineBitmapStore {
+    map: BTreeMap<(u32, EffectLine), RoaringBitmap>,
+}
+
 impl BitmapStore {
     pub fn new() -> Self {
         Self {
@@ -56,6 +81,57 @@ impl BitmapStore {
 }
 
 impl Default for BitmapStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PerLineBitmapStore {
+    pub fn new() -> Self {
+        Self {
+            map: BTreeMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, id_gd: u32, line: EffectLine, card_index: u32) {
+        self.map
+            .entry((id_gd, line))
+            .or_default()
+            .insert(card_index);
+    }
+
+    pub fn get(&self, id_gd: u32, line: EffectLine) -> Option<&RoaringBitmap> {
+        self.map.get(&(id_gd, line))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&(u32, EffectLine), &RoaringBitmap)> {
+        self.map.iter()
+    }
+
+    /// Write bitmap files; returns serialized byte size per `(idGd, EffectLine)`.
+    ///
+    /// Empty bitmaps are omitted from disk and from the returned sizes map.
+    pub fn write_dir(&self, dir: &Path) -> Result<BTreeMap<(u32, EffectLine), u64>> {
+        fs::create_dir_all(dir)?;
+        let mut sizes = BTreeMap::new();
+        for ((id_gd, line), bitmap) in &self.map {
+            if bitmap.is_empty() {
+                continue;
+            }
+            let path = dir.join(format!("{id_gd}_{}.roar", line.suffix()));
+            let mut bytes = Vec::new();
+            bitmap
+                .serialize_into(&mut bytes)
+                .with_context(|| format!("serialize idGd {id_gd} line {}", line.suffix()))?;
+            let size = bytes.len() as u64;
+            fs::write(&path, bytes)?;
+            sizes.insert((*id_gd, *line), size);
+        }
+        Ok(sizes)
+    }
+}
+
+impl Default for PerLineBitmapStore {
     fn default() -> Self {
         Self::new()
     }

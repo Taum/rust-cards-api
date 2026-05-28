@@ -1,4 +1,4 @@
-use crate::bitmap::BitmapStore;
+use crate::bitmap::{BitmapStore, EffectLine, PerLineBitmapStore};
 use crate::card::{effects_from_card, CardJson};
 use crate::catalog::{Catalog, CatalogBuilder};
 use crate::compact::{compact_fields_from_card, write_compact_records, CompactCardFields};
@@ -84,6 +84,7 @@ pub fn build(
     let measure_phases = progress.tracks_phases() || profiling;
     let mut catalog_builder = CatalogBuilder::new(set);
     let mut bitmaps = BitmapStore::new();
+    let mut per_line_bitmaps = PerLineBitmapStore::new();
     let mut idgd_catalog_builder = IdGdCatalogBuilder::new();
     let mut compact_cards: Vec<(u32, CompactCardFields)> = Vec::with_capacity(total_files);
     let mut stat_index = StatIndexBuilder::new();
@@ -94,6 +95,7 @@ pub fn build(
             file,
             &mut catalog_builder,
             &mut bitmaps,
+            &mut per_line_bitmaps,
             &mut idgd_catalog_builder,
             &mut compact_cards,
             &mut stat_index,
@@ -125,6 +127,7 @@ pub fn build(
                     limit,
                     &catalog,
                     &bitmaps,
+                    &per_line_bitmaps,
                     idgd_catalog_builder,
                     compact_cards,
                     stat_index,
@@ -142,6 +145,7 @@ pub fn build(
                 limit,
                 &catalog,
                 &bitmaps,
+                &per_line_bitmaps,
                 idgd_catalog_builder,
                 compact_cards,
                 stat_index,
@@ -173,6 +177,7 @@ fn index_one_card(
     file: &CardFile,
     catalog_builder: &mut CatalogBuilder,
     bitmaps: &mut BitmapStore,
+    per_line_bitmaps: &mut PerLineBitmapStore,
     idgd_catalog_builder: &mut IdGdCatalogBuilder,
     compact_cards: &mut Vec<(u32, CompactCardFields)>,
     stat_index: &mut StatIndexBuilder,
@@ -192,6 +197,7 @@ fn index_one_card(
             card_index,
             &card,
             bitmaps,
+            per_line_bitmaps,
             idgd_catalog_builder,
             compact_cards,
             stat_index,
@@ -225,6 +231,7 @@ fn apply_card_index(
     card_index: u32,
     card: &CardJson,
     bitmaps: &mut BitmapStore,
+    per_line_bitmaps: &mut PerLineBitmapStore,
     idgd_catalog_builder: &mut IdGdCatalogBuilder,
     compact_cards: &mut Vec<(u32, CompactCardFields)>,
     stat_index: &mut StatIndexBuilder,
@@ -236,6 +243,27 @@ fn apply_card_index(
         bitmaps.insert(occ.id_gd, card_index);
     }
     let compact = compact_fields_from_card(card);
+
+    // Per-effect-line bitmaps (3 MAIN_EFFECT lines + 1 ECHO line).
+    for (g, ids) in compact.main_effect.iter().enumerate() {
+        let line = match g {
+            0 => EffectLine::M1,
+            1 => EffectLine::M2,
+            2 => EffectLine::M3,
+            _ => continue,
+        };
+        for &id in ids {
+            if id != 0 {
+                per_line_bitmaps.insert(id as u32, line, card_index);
+            }
+        }
+    }
+    for &id in &compact.echo_effect {
+        if id != 0 {
+            per_line_bitmaps.insert(id as u32, EffectLine::Ec, card_index);
+        }
+    }
+
     stat_index.insert(card_index, &compact);
     faction_index.insert(card_index, &compact);
     compact_cards.push((card_index, compact));
@@ -248,6 +276,7 @@ fn write_index_outputs(
     limit: Option<usize>,
     catalog: &Catalog,
     bitmaps: &BitmapStore,
+    per_line_bitmaps: &PerLineBitmapStore,
     idgd_catalog_builder: IdGdCatalogBuilder,
     compact_cards: Vec<(u32, CompactCardFields)>,
     stat_index: StatIndexBuilder,
@@ -257,7 +286,14 @@ fn write_index_outputs(
     fs_create_dir_all(set_out)?;
     catalog.save(&set_out.join("catalog.json"))?;
     let bitmap_bytes = bitmaps.write_dir(&id_gd_dir)?;
-    let idgd_catalog = idgd_catalog_builder.build(set, bitmaps, &bitmap_bytes);
+    let per_line_bitmap_bytes = per_line_bitmaps.write_dir(&id_gd_dir)?;
+    let idgd_catalog = idgd_catalog_builder.build(
+        set,
+        bitmaps,
+        &bitmap_bytes,
+        per_line_bitmaps,
+        &per_line_bitmap_bytes,
+    );
     IdGdCatalogBuilder::save(&idgd_catalog, &set_out.join("idgd_catalog.json"))?;
 
     write_compact_records(&set_out.join("cards.bin"), catalog.total_bit_span, &compact_cards)?;

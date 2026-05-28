@@ -57,7 +57,7 @@ fn build_query_decode_tmp_fixtures() {
     let decoded = catalog.decode_bit(ax.start_bit + 4).expect("decode AX_06 U_5");
     assert_eq!(decoded.reference, "ALT_COREKS_B_AX_06_U_5");
 
-    let result = query::query_id_gd(out.path(), "COREKS", 90, Some(5)).expect("query");
+    let result = query::query_id_gd(out.path(), "COREKS", 90, Some(5), false).expect("query");
     assert!(result.cardinality >= 1);
 
     let idgd_text =
@@ -72,6 +72,22 @@ fn build_query_decode_tmp_fixtures() {
     assert_eq!(sample["card_count"].as_u64(), Some(1));
     assert!(sample["bitmap_bytes"].as_u64().unwrap_or(0) > 0);
     assert!(sample["translations"]["en_US"]["text"].is_string());
+
+    // Per-effect-line bitmaps should exist when non-empty and be reflected in the catalog.
+    // Fixture `ALT_COREKS_B_AX_06_U_5.json` contains idGd 24 in MAIN_EFFECT line 1 and 2, so:
+    // - 24_m1.roar exists
+    // - 24_m2.roar exists
+    // - 24_m3.roar is omitted
+    let sample_24 = entries
+        .iter()
+        .find(|e| e["id_gd"].as_u64() == Some(24))
+        .expect("idGd 24 entry");
+    assert!(summary.output_dir.join("id_gd/24_m1.roar").is_file());
+    assert!(summary.output_dir.join("id_gd/24_m2.roar").is_file());
+    assert!(!summary.output_dir.join("id_gd/24_m3.roar").exists());
+    assert_eq!(sample_24["m1"]["card_count"].as_u64(), Some(1));
+    assert_eq!(sample_24["m2"]["card_count"].as_u64(), Some(1));
+    assert!(sample_24.get("m3").is_none() || sample_24["m3"].is_null());
 
     let stats_summary_path = summary.output_dir.join("stats_summary.json");
     assert!(stats_summary_path.is_file(), "stats_summary.json missing");

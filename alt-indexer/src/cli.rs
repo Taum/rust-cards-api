@@ -81,6 +81,9 @@ pub enum Command {
         /// Locale key for effect translation (e.g. en_US, fr_FR).
         #[arg(long, default_value = "en_US")]
         locale: String,
+        /// Use whole-card combined bitmaps (`{id}.roar`) instead of per-line sub-indexes.
+        #[arg(long, default_value_t = false)]
+        whole_card: bool,
     },
     /// Merge multiple existing per-SET indexes into one merged index.
     Merge {
@@ -120,6 +123,9 @@ pub enum Command {
         /// Print first N sampled queries (sanity check; adds output noise).
         #[arg(long)]
         print_samples: Option<usize>,
+        /// Use whole-card combined bitmaps (`{id}.roar`) instead of per-line sub-indexes.
+        #[arg(long, default_value_t = false)]
+        whole_card: bool,
     },
 }
 
@@ -172,10 +178,12 @@ pub fn run() -> Result<()> {
             list,
             show_effect,
             locale,
+            whole_card,
         } => {
             if show_effect {
-                let result =
-                    query::query_id_gds_effect_text(&index_dir, &set, &id_gd, list, &locale)?;
+                let result = query::query_id_gds_effect_text(
+                    &index_dir, &set, &id_gd, list, &locale, whole_card,
+                )?;
                 println!("query: {} cards", result.cardinality);
                 if !result.recap_lines.is_empty() {
                     println!();
@@ -198,7 +206,7 @@ pub fn run() -> Result<()> {
                     }
                 }
             } else {
-                let result = query::query_id_gds(&index_dir, &set, &id_gd, list)?;
+                let result = query::query_id_gds(&index_dir, &set, &id_gd, list, whole_card)?;
                 println!("query: {} cards", result.cardinality);
                 if !result.rows.is_empty() {
                     println!();
@@ -253,6 +261,7 @@ pub fn run() -> Result<()> {
             warmup,
             json_out,
             print_samples,
+            whole_card,
         } => {
             bench_query::run(
                 &index_dir,
@@ -264,6 +273,7 @@ pub fn run() -> Result<()> {
                     multi_ids,
                     json_out,
                     print_samples,
+                    whole_card,
                 },
             )?;
         }

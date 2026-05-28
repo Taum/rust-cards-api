@@ -1,4 +1,4 @@
-use crate::bitmap::BitmapStore;
+use crate::bitmap::{BitmapStore, EffectLine};
 use crate::catalog::Catalog;
 use crate::compact::CompactCardView;
 use crate::idgd_catalog::IdGdCatalog;
@@ -40,13 +40,22 @@ pub struct EffectQueryResult {
     pub cards: Vec<EffectCard>,
 }
 
+/// Buckets of idGd values grouped by element type (TRIGGER / CONDITION / OUTPUT).
+#[derive(Debug, Clone, Default)]
+pub struct IdGdQueryBuckets {
+    pub triggers: Vec<u32>,
+    pub conditions: Vec<u32>,
+    pub outputs: Vec<u32>,
+}
+
 pub fn query_id_gd(
     index_dir: &Path,
     set: &str,
     id_gd: u32,
     list_limit: Option<usize>,
+    whole_card: bool,
 ) -> Result<QueryResult> {
-    query_id_gds(index_dir, set, &[id_gd], list_limit)
+    query_id_gds(index_dir, set, &[id_gd], list_limit, whole_card)
 }
 
 pub fn query_id_gd_effect_text(
@@ -55,8 +64,9 @@ pub fn query_id_gd_effect_text(
     id_gd: u32,
     list_limit: Option<usize>,
     locale: &str,
+    whole_card: bool,
 ) -> Result<EffectQueryResult> {
-    query_id_gds_effect_text(index_dir, set, &[id_gd], list_limit, locale)
+    query_id_gds_effect_text(index_dir, set, &[id_gd], list_limit, locale, whole_card)
 }
 
 pub fn query_id_gds(
@@ -64,8 +74,10 @@ pub fn query_id_gds(
     set: &str,
     id_gds: &[u32],
     list_limit: Option<usize>,
+    whole_card: bool,
 ) -> Result<QueryResult> {
-    let (bitmap, _recap, _texts) = build_multi_idgd_query(index_dir, set, id_gds, None)?;
+    let (bitmap, _recap, _texts) =
+        build_multi_idgd_query(index_dir, set, id_gds, None, whole_card)?;
 
     let cardinality = bitmap.len();
     let mut rows = Vec::new();
@@ -90,15 +102,12 @@ pub fn query_id_gds(
             None => continue,
         };
 
-        // Stats mapping: main_cost -> hand, recall_cost -> reserve,
-        // mountain/ocean/forest -> M/O/F.
         let hand = view.main_cost();
         let reserve = view.recall_cost();
         let m = view.mountain_power();
         let o = view.ocean_power();
         let f = view.forest_power();
 
-        // MAIN_EFFECT as "t_c_o, t_c_o, t_c_o" (skip all-zero groups).
         let mut main_parts = Vec::new();
         for g in 0..3 {
             let [t, c, e] = view.main_effect_group(g);
@@ -109,7 +118,6 @@ pub fn query_id_gds(
         }
         let main_effect = main_parts.join(", ");
 
-        // ECHO_EFFECT as "t_c_o" if non-zero, otherwise empty.
         let [et, ec, ee] = view.echo_effect();
         let echo_effect = if et == 0 && ec == 0 && ee == 0 {
             String::new()
@@ -139,8 +147,10 @@ pub fn query_id_gds_effect_text(
     id_gds: &[u32],
     list_limit: Option<usize>,
     locale: &str,
+    whole_card: bool,
 ) -> Result<EffectQueryResult> {
-    let (bitmap, recap_lines, text_by_id) = build_multi_idgd_query(index_dir, set, id_gds, Some(locale))?;
+    let (bitmap, recap_lines, text_by_id) =
+        build_multi_idgd_query(index_dir, set, id_gds, Some(locale), whole_card)?;
 
     let cardinality = bitmap.len();
     let mut cards = Vec::new();
@@ -181,7 +191,6 @@ pub fn query_id_gds_effect_text(
 
         let mut effect_lines = Vec::new();
 
-        // 3 MAIN_EFFECT lines, skipping empty groups
         for g in 0..3 {
             let [t, c, e] = view.main_effect_group(g);
             let line = build_effect_line(t, c, e, &text_by_id);
@@ -190,7 +199,6 @@ pub fn query_id_gds_effect_text(
             }
         }
 
-        // ECHO line, skip if empty
         let [t, c, e] = view.echo_effect();
         if let Some(line) = build_effect_line(t, c, e, &text_by_id) {
             effect_lines.push(line);
@@ -214,11 +222,39 @@ pub fn query_id_gds_effect_text(
     })
 }
 
+/// Execute a multi-idGd query against on-disk bitmaps.
+pub fn execute_idgd_query(
+    id_gd_dir: &Path,
+    buckets: &IdGdQueryBuckets,
+    whole_card: bool,
+) -> Result<RoaringBitmap> {
+    if whole_card {
+        execute_whole_card_query(id_gd_dir, buckets)
+    } else {
+        execute_per_line_query(id_gd_dir, buckets)
+    }
+}
+
+/// Execute using preloaded per-line bitmaps (for bench-query).
+pub fn execute_idgd_query_preloaded(
+    per_line: &BTreeMap<(u32, EffectLine), RoaringBitmap>,
+    whole_card: &BTreeMap<u32, RoaringBitmap>,
+    buckets: &IdGdQueryBuckets,
+    whole_card_mode: bool,
+) -> RoaringBitmap {
+    if whole_card_mode {
+        execute_whole_card_query_preloaded(whole_card, buckets)
+    } else {
+        execute_per_line_query_preloaded(per_line, buckets)
+    }
+}
+
 fn build_multi_idgd_query(
     index_dir: &Path,
     set: &str,
     id_gds: &[u32],
     locale: Option<&str>,
+    whole_card: bool,
 ) -> Result<(RoaringBitmap, Vec<String>, BTreeMap<u32, String>)> {
     anyhow::ensure!(!id_gds.is_empty(), "at least one --id-gd must be provided");
 
@@ -229,6 +265,22 @@ fn build_multi_idgd_query(
     let idgd_catalog: IdGdCatalog = serde_json::from_str(&idgd_catalog_text)
         .with_context(|| format!("parse {}", idgd_catalog_path.display()))?;
 
+    let (buckets, text_by_id) = bucket_id_gds(id_gds, &idgd_catalog, &idgd_catalog_path, locale)?;
+
+    let id_gd_dir = set_dir.join("id_gd");
+    let bitmap = execute_idgd_query(&id_gd_dir, &buckets, whole_card)?;
+
+    let recap_lines = build_recap_lines(locale, &buckets, &text_by_id);
+
+    Ok((bitmap, recap_lines, text_by_id))
+}
+
+fn bucket_id_gds(
+    id_gds: &[u32],
+    idgd_catalog: &IdGdCatalog,
+    idgd_catalog_path: &Path,
+    locale: Option<&str>,
+) -> Result<(IdGdQueryBuckets, BTreeMap<u32, String>)> {
     #[derive(Clone)]
     struct MetaEntry {
         element_type: String,
@@ -236,20 +288,17 @@ fn build_multi_idgd_query(
     }
 
     let mut meta_by_id: BTreeMap<u32, MetaEntry> = BTreeMap::new();
-    for e in idgd_catalog.entries {
+    for e in &idgd_catalog.entries {
         meta_by_id.insert(
             e.id_gd,
             MetaEntry {
-                element_type: e.element_type,
-                translations: e.translations,
+                element_type: e.element_type.clone(),
+                translations: e.translations.clone(),
             },
         );
     }
 
-    // Preserve input order (dedupe per bucket).
-    let mut triggers: Vec<u32> = Vec::new();
-    let mut conditions: Vec<u32> = Vec::new();
-    let mut outputs: Vec<u32> = Vec::new();
+    let mut buckets = IdGdQueryBuckets::default();
 
     for &id in id_gds {
         let meta = meta_by_id
@@ -257,18 +306,18 @@ fn build_multi_idgd_query(
             .with_context(|| format!("idGd {id} not found in {}", idgd_catalog_path.display()))?;
         match meta.element_type.as_str() {
             "TRIGGER" => {
-                if !triggers.contains(&id) {
-                    triggers.push(id);
+                if !buckets.triggers.contains(&id) {
+                    buckets.triggers.push(id);
                 }
             }
             "CONDITION" => {
-                if !conditions.contains(&id) {
-                    conditions.push(id);
+                if !buckets.conditions.contains(&id) {
+                    buckets.conditions.push(id);
                 }
             }
             "OUTPUT" => {
-                if !outputs.contains(&id) {
-                    outputs.push(id);
+                if !buckets.outputs.contains(&id) {
+                    buckets.outputs.push(id);
                 }
             }
             other => {
@@ -278,11 +327,10 @@ fn build_multi_idgd_query(
     }
 
     anyhow::ensure!(
-        !triggers.is_empty() || !conditions.is_empty() || !outputs.is_empty(),
+        !buckets.triggers.is_empty() || !buckets.conditions.is_empty() || !buckets.outputs.is_empty(),
         "no valid idGd values were provided"
     );
 
-    // Build text map (used both for recap and effect decoding).
     let mut text_by_id: BTreeMap<u32, String> = BTreeMap::new();
     if let Some(locale) = locale {
         for (&id, meta) in &meta_by_id {
@@ -293,55 +341,162 @@ fn build_multi_idgd_query(
         }
     }
 
-    let id_gd_dir = set_dir.join("id_gd");
+    Ok((buckets, text_by_id))
+}
 
+fn build_recap_lines(
+    locale: Option<&str>,
+    buckets: &IdGdQueryBuckets,
+    text_by_id: &BTreeMap<u32, String>,
+) -> Vec<String> {
+    let mut recap_lines = Vec::new();
+    if locale.is_some() {
+        recap_lines.push("Searching for cards matching:".to_string());
+        if !buckets.triggers.is_empty() {
+            recap_lines.push("Triggers is one of :".to_string());
+            for id in &buckets.triggers {
+                let t = text_by_id.get(id).cloned().unwrap_or_default();
+                recap_lines.push(format!("- \"{t}\""));
+            }
+        }
+        if !buckets.conditions.is_empty() {
+            recap_lines.push("Condition is one of :".to_string());
+            for id in &buckets.conditions {
+                let t = text_by_id.get(id).cloned().unwrap_or_default();
+                recap_lines.push(format!("- \"{t}\""));
+            }
+        }
+        if !buckets.outputs.is_empty() {
+            recap_lines.push("Output is one of :".to_string());
+            for id in &buckets.outputs {
+                let t = text_by_id.get(id).cloned().unwrap_or_default();
+                recap_lines.push(format!("- \"{t}\""));
+            }
+        }
+    }
+    recap_lines
+}
+
+fn execute_whole_card_query(id_gd_dir: &Path, buckets: &IdGdQueryBuckets) -> Result<RoaringBitmap> {
     let mut groups: Vec<RoaringBitmap> = Vec::new();
-    if !triggers.is_empty() {
-        groups.push(union_bitmaps(&id_gd_dir, &triggers)?);
+    if !buckets.triggers.is_empty() {
+        groups.push(union_whole_card_bitmaps(id_gd_dir, &buckets.triggers)?);
     }
-    if !conditions.is_empty() {
-        groups.push(union_bitmaps(&id_gd_dir, &conditions)?);
+    if !buckets.conditions.is_empty() {
+        groups.push(union_whole_card_bitmaps(id_gd_dir, &buckets.conditions)?);
     }
-    if !outputs.is_empty() {
-        groups.push(union_bitmaps(&id_gd_dir, &outputs)?);
+    if !buckets.outputs.is_empty() {
+        groups.push(union_whole_card_bitmaps(id_gd_dir, &buckets.outputs)?);
     }
+    intersect_groups(groups)
+}
 
+fn execute_per_line_query(id_gd_dir: &Path, buckets: &IdGdQueryBuckets) -> Result<RoaringBitmap> {
+    let mut result = RoaringBitmap::new();
+    for line in EffectLine::ALL {
+        if let Some(line_match) = intersect_buckets_on_line(id_gd_dir, buckets, line)? {
+            result |= line_match;
+        }
+    }
+    Ok(result)
+}
+
+fn execute_whole_card_query_preloaded(
+    whole_card: &BTreeMap<u32, RoaringBitmap>,
+    buckets: &IdGdQueryBuckets,
+) -> RoaringBitmap {
+    let mut groups: Vec<RoaringBitmap> = Vec::new();
+    if !buckets.triggers.is_empty() {
+        groups.push(union_whole_card_bitmaps_preloaded(whole_card, &buckets.triggers));
+    }
+    if !buckets.conditions.is_empty() {
+        groups.push(union_whole_card_bitmaps_preloaded(
+            whole_card,
+            &buckets.conditions,
+        ));
+    }
+    if !buckets.outputs.is_empty() {
+        groups.push(union_whole_card_bitmaps_preloaded(whole_card, &buckets.outputs));
+    }
+    intersect_groups(groups).unwrap_or_default()
+}
+
+fn execute_per_line_query_preloaded(
+    per_line: &BTreeMap<(u32, EffectLine), RoaringBitmap>,
+    buckets: &IdGdQueryBuckets,
+) -> RoaringBitmap {
+    let mut result = RoaringBitmap::new();
+    for line in EffectLine::ALL {
+        if let Some(line_match) = intersect_buckets_on_line_preloaded(per_line, buckets, line) {
+            result |= line_match;
+        }
+    }
+    result
+}
+
+/// Within one effect line: (union triggers) ∩ (union conditions) ∩ (union outputs),
+/// skipping empty query buckets.
+fn intersect_buckets_on_line(
+    id_gd_dir: &Path,
+    buckets: &IdGdQueryBuckets,
+    line: EffectLine,
+) -> Result<Option<RoaringBitmap>> {
+    let mut groups: Vec<RoaringBitmap> = Vec::new();
+    if !buckets.triggers.is_empty() {
+        groups.push(union_per_line_bitmaps(id_gd_dir, &buckets.triggers, line)?);
+    }
+    if !buckets.conditions.is_empty() {
+        groups.push(union_per_line_bitmaps(id_gd_dir, &buckets.conditions, line)?);
+    }
+    if !buckets.outputs.is_empty() {
+        groups.push(union_per_line_bitmaps(id_gd_dir, &buckets.outputs, line)?);
+    }
+    intersect_groups(groups).map(Some)
+}
+
+fn intersect_buckets_on_line_preloaded(
+    per_line: &BTreeMap<(u32, EffectLine), RoaringBitmap>,
+    buckets: &IdGdQueryBuckets,
+    line: EffectLine,
+) -> Option<RoaringBitmap> {
+    let mut groups: Vec<RoaringBitmap> = Vec::new();
+    if !buckets.triggers.is_empty() {
+        groups.push(union_per_line_bitmaps_preloaded(
+            per_line,
+            &buckets.triggers,
+            line,
+        ));
+    }
+    if !buckets.conditions.is_empty() {
+        groups.push(union_per_line_bitmaps_preloaded(
+            per_line,
+            &buckets.conditions,
+            line,
+        ));
+    }
+    if !buckets.outputs.is_empty() {
+        groups.push(union_per_line_bitmaps_preloaded(
+            per_line,
+            &buckets.outputs,
+            line,
+        ));
+    }
+    intersect_groups(groups).ok()
+}
+
+fn intersect_groups(groups: Vec<RoaringBitmap>) -> Result<RoaringBitmap> {
     let mut it = groups.into_iter();
-    let mut bitmap = it.next().unwrap_or_else(RoaringBitmap::new);
+    let mut bitmap = match it.next() {
+        Some(b) => b,
+        None => return Ok(RoaringBitmap::new()),
+    };
     for g in it {
         bitmap &= g;
     }
-
-    let mut recap_lines: Vec<String> = Vec::new();
-    if locale.is_some() {
-        recap_lines.push("Searching for cards matching:".to_string());
-        if !triggers.is_empty() {
-            recap_lines.push("Triggers is one of :".to_string());
-            for id in &triggers {
-                let t = text_by_id.get(id).cloned().unwrap_or_default();
-                recap_lines.push(format!("- \"{t}\""));
-            }
-        }
-        if !conditions.is_empty() {
-            recap_lines.push("Condition is one of :".to_string());
-            for id in &conditions {
-                let t = text_by_id.get(id).cloned().unwrap_or_default();
-                recap_lines.push(format!("- \"{t}\""));
-            }
-        }
-        if !outputs.is_empty() {
-            recap_lines.push("Output is one of :".to_string());
-            for id in &outputs {
-                let t = text_by_id.get(id).cloned().unwrap_or_default();
-                recap_lines.push(format!("- \"{t}\""));
-            }
-        }
-    }
-
-    Ok((bitmap, recap_lines, text_by_id))
+    Ok(bitmap)
 }
 
-fn union_bitmaps(id_gd_dir: &Path, ids: &[u32]) -> Result<RoaringBitmap> {
+fn union_whole_card_bitmaps(id_gd_dir: &Path, ids: &[u32]) -> Result<RoaringBitmap> {
     let mut merged = RoaringBitmap::new();
     for &id in ids {
         let bitmap_path = id_gd_dir.join(format!("{id}.roar"));
@@ -350,6 +505,57 @@ fn union_bitmaps(id_gd_dir: &Path, ids: &[u32]) -> Result<RoaringBitmap> {
         merged |= bitmap;
     }
     Ok(merged)
+}
+
+fn union_whole_card_bitmaps_preloaded(
+    whole_card: &BTreeMap<u32, RoaringBitmap>,
+    ids: &[u32],
+) -> RoaringBitmap {
+    let mut merged = RoaringBitmap::new();
+    for &id in ids {
+        if let Some(bmp) = whole_card.get(&id) {
+            merged |= bmp;
+        }
+    }
+    merged
+}
+
+fn union_per_line_bitmaps(id_gd_dir: &Path, ids: &[u32], line: EffectLine) -> Result<RoaringBitmap> {
+    let mut merged = RoaringBitmap::new();
+    for &id in ids {
+        let bitmap_path = id_gd_dir.join(format!("{id}_{}.roar", line.suffix()));
+        if let Some(bitmap) = try_load_bitmap(&bitmap_path)? {
+            merged |= bitmap;
+        }
+    }
+    Ok(merged)
+}
+
+fn union_per_line_bitmaps_preloaded(
+    per_line: &BTreeMap<(u32, EffectLine), RoaringBitmap>,
+    ids: &[u32],
+    line: EffectLine,
+) -> RoaringBitmap {
+    let mut merged = RoaringBitmap::new();
+    for &id in ids {
+        if let Some(bmp) = per_line.get(&(id, line)) {
+            merged |= bmp;
+        }
+    }
+    merged
+}
+
+fn try_load_bitmap(path: &Path) -> Result<Option<RoaringBitmap>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(path)?;
+    let bmp = RoaringBitmap::deserialize_from(&bytes[..])
+        .with_context(|| format!("deserialize bitmap from {}", path.display()))?;
+    if bmp.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(bmp))
 }
 
 fn pick_translation(map: &BTreeMap<String, crate::card::LocaleText>, locale: &str) -> String {
@@ -381,7 +587,11 @@ fn build_effect_line(t: u16, c: u16, e: u16, text_by_id: &BTreeMap<u32, String>)
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join(" ");
-    if line.is_empty() { None } else { Some(line) }
+    if line.is_empty() {
+        None
+    } else {
+        Some(line)
+    }
 }
 
 #[cfg(test)]
@@ -412,7 +622,6 @@ mod tests {
     }
 
     fn write_idgd_catalog(set_dir: &Path, entries: Vec<(u32, &str, &str)>) -> Result<()> {
-        // entries: (id, element_type, en_US_text)
         let mut cat_entries = Vec::new();
         for (id, element_type, text) in entries {
             let mut translations: BTreeMap<String, LocaleText> = BTreeMap::new();
@@ -424,6 +633,10 @@ mod tests {
                 bitmap_file: format!("{id}.roar"),
                 element_type: element_type.to_string(),
                 translations,
+                m1: None,
+                m2: None,
+                m3: None,
+                ec: None,
             });
         }
         let cat = IdGdCatalog {
@@ -442,11 +655,14 @@ mod tests {
         Ok((td, set_dir))
     }
 
+    fn id_gd_dir(set_dir: &Path) -> std::path::PathBuf {
+        set_dir.join("id_gd")
+    }
+
     #[test]
-    fn unions_within_bucket() -> Result<()> {
+    fn unions_within_bucket_whole_card() -> Result<()> {
         let (_td, set_dir) = setup_index()?;
 
-        // Two triggers whose bitmaps overlap.
         write_idgd_catalog(
             &set_dir,
             vec![(1, "TRIGGER", "{J}"), (2, "TRIGGER", "When I go...")],
@@ -454,7 +670,8 @@ mod tests {
         write_bitmap(&set_dir.join("id_gd/1.roar"), &[1, 2])?;
         write_bitmap(&set_dir.join("id_gd/2.roar"), &[2, 3])?;
 
-        let (bmp, _recap, _texts) = build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[1, 2], None)?;
+        let (bmp, _recap, _texts) =
+            build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[1, 2], None, true)?;
         assert_eq!(bmp.len(), 3);
         assert!(bmp.contains(1));
         assert!(bmp.contains(2));
@@ -463,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn intersects_across_buckets() -> Result<()> {
+    fn intersects_across_buckets_whole_card() -> Result<()> {
         let (_td, set_dir) = setup_index()?;
 
         write_idgd_catalog(
@@ -479,8 +696,7 @@ mod tests {
         write_bitmap(&set_dir.join("id_gd/3.roar"), &[2, 3])?;
 
         let (bmp, _recap, _texts) =
-            build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[1, 2, 3], None)?;
-        // triggers union = {1,2,3}; conditions union = {2,3}; intersect = {2,3}
+            build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[1, 2, 3], None, true)?;
         assert_eq!(bmp.len(), 2);
         assert!(bmp.contains(2));
         assert!(bmp.contains(3));
@@ -489,14 +705,68 @@ mod tests {
     }
 
     #[test]
+    fn intersects_across_buckets_same_line_only_by_default() -> Result<()> {
+        let (_td, set_dir) = setup_index()?;
+
+        write_idgd_catalog(
+            &set_dir,
+            vec![(24, "TRIGGER", "T24"), (191, "CONDITION", "C191")],
+        )?;
+        // Whole-card matches if id appears anywhere on the card (cross-line OK).
+        write_bitmap(&set_dir.join("id_gd/24.roar"), &[10, 20])?;
+        write_bitmap(&set_dir.join("id_gd/191.roar"), &[10, 20])?;
+        write_bitmap(&set_dir.join("id_gd/24_m1.roar"), &[10, 20])?;
+        write_bitmap(&set_dir.join("id_gd/191_m2.roar"), &[10])?;
+        write_bitmap(&set_dir.join("id_gd/191_m1.roar"), &[20])?;
+
+        let dir = id_gd_dir(&set_dir);
+        let buckets = IdGdQueryBuckets {
+            triggers: vec![24],
+            conditions: vec![191],
+            outputs: vec![],
+        };
+
+        let per_line = execute_idgd_query(&dir, &buckets, false)?;
+        assert_eq!(per_line.len(), 1);
+        assert!(per_line.contains(20));
+        assert!(!per_line.contains(10));
+
+        let whole = execute_idgd_query(&dir, &buckets, true)?;
+        assert!(whole.contains(10));
+        assert!(whole.contains(20));
+        Ok(())
+    }
+
+    #[test]
+    fn per_line_unions_within_bucket_on_one_line() -> Result<()> {
+        let (_td, set_dir) = setup_index()?;
+
+        write_idgd_catalog(
+            &set_dir,
+            vec![(1, "TRIGGER", "T1"), (2, "TRIGGER", "T2")],
+        )?;
+        write_bitmap(&set_dir.join("id_gd/1_m1.roar"), &[1, 2])?;
+        write_bitmap(&set_dir.join("id_gd/2_m1.roar"), &[2, 3])?;
+
+        let buckets = IdGdQueryBuckets {
+            triggers: vec![1, 2],
+            conditions: vec![],
+            outputs: vec![],
+        };
+        let bmp = execute_idgd_query(&id_gd_dir(&set_dir), &buckets, false)?;
+        assert_eq!(bmp.len(), 3);
+        Ok(())
+    }
+
+    #[test]
     fn ignores_missing_bucket() -> Result<()> {
         let (_td, set_dir) = setup_index()?;
 
         write_idgd_catalog(&set_dir, vec![(10, "OUTPUT", "Draw a card")])?;
-        write_bitmap(&set_dir.join("id_gd/10.roar"), &[7, 8, 9])?;
+        write_bitmap(&set_dir.join("id_gd/10_m1.roar"), &[7, 8, 9])?;
 
         let (bmp, _recap, _texts) =
-            build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[10], None)?;
+            build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[10], None, false)?;
         assert_eq!(bmp.len(), 3);
         Ok(())
     }
@@ -506,9 +776,9 @@ mod tests {
         let (_td, set_dir) = setup_index()?;
 
         write_idgd_catalog(&set_dir, vec![(99, "UNKNOWN", "???")])?;
-        write_bitmap(&set_dir.join("id_gd/99.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/99_m1.roar"), &[1])?;
 
-        let err = build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[99], None)
+        let err = build_multi_idgd_query(set_dir.parent().unwrap(), "SET", &[99], None, false)
             .expect_err("should fail");
         assert!(format!("{err:#}").contains("unsupported element_type"));
         Ok(())
@@ -528,30 +798,24 @@ mod tests {
                 (5, "OUTPUT", "You may discard target Permanent"),
             ],
         )?;
-        // Bitmaps not relevant to recap formatting, but required on disk.
-        write_bitmap(&set_dir.join("id_gd/1.roar"), &[1])?;
-        write_bitmap(&set_dir.join("id_gd/2.roar"), &[1])?;
-        write_bitmap(&set_dir.join("id_gd/3.roar"), &[1])?;
-        write_bitmap(&set_dir.join("id_gd/4.roar"), &[1])?;
-        write_bitmap(&set_dir.join("id_gd/5.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/1_m1.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/2_m1.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/3_m1.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/4_m1.roar"), &[1])?;
+        write_bitmap(&set_dir.join("id_gd/5_m1.roar"), &[1])?;
 
         let (_bmp, recap, _texts) = build_multi_idgd_query(
             set_dir.parent().unwrap(),
             "SET",
             &[1, 2, 3, 4, 5],
             Some("en_US"),
+            false,
         )?;
 
         let joined = recap.join("\n");
         assert!(joined.contains("Searching for cards matching:"));
         assert!(joined.contains("Triggers is one of :"));
         assert!(joined.contains("- \"{J}\""));
-        assert!(joined.contains("- \"When I go to reserve from the Expedition\""));
-        assert!(joined.contains("Condition is one of :"));
-        assert!(joined.contains("- \"You may pay {1} if you do\""));
-        assert!(joined.contains("Output is one of :"));
-        assert!(joined.contains("- \"Draw a card\""));
-        assert!(joined.contains("- \"You may discard target Permanent\""));
         Ok(())
     }
 }

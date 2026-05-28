@@ -1,6 +1,7 @@
 use crate::catalog::{Catalog, FamilyEntry, FACTION_ORDER};
 use crate::compact::RECORD_SIZE;
-use crate::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
+use crate::bitmap::EffectLine;
+use crate::idgd_catalog::{BitmapMeta, IdGdCatalog, IdGdCatalogEntry};
 use anyhow::{anyhow, Context, Result};
 use roaring::RoaringBitmap;
 use serde::{Deserialize, Serialize};
@@ -511,6 +512,48 @@ fn merge_id_gd(
         sizes.insert(id, len);
     }
 
+    // Merge per-effect-line idGd bitmaps (if present in any source).
+    for id in sizes.keys().copied().collect::<Vec<_>>() {
+        for line in [EffectLine::M1, EffectLine::M2, EffectLine::M3, EffectLine::Ec] {
+            let mut merged = RoaringBitmap::new();
+            for src in sources {
+                let src_path = src
+                    .dir
+                    .join("id_gd")
+                    .join(format!("{id}_{}.roar", line.suffix()));
+                if !src_path.exists() {
+                    continue;
+                }
+                let bmp = load_bitmap(&src_path)
+                    .with_context(|| format!("load {}", src_path.display()))?;
+                match plan.mapping.get(&src.set).expect("mapping exists") {
+                    Mapping::Offset { base } => {
+                        for b in bmp.iter() {
+                            merged.insert(base + b);
+                        }
+                    }
+                    Mapping::RemapVec { map } => {
+                        for b in bmp.iter() {
+                            let dst = map[b as usize];
+                            if dst != u32::MAX {
+                                merged.insert(dst);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if merged.is_empty() {
+                continue;
+            }
+
+            let out_path = out_dir.join(format!("{id}_{}.roar", line.suffix()));
+            let mut bytes = Vec::new();
+            merged.serialize_into(&mut bytes)?;
+            fs::write(&out_path, bytes)?;
+        }
+    }
+
     Ok((sizes.len(), sizes, meta))
 }
 
@@ -717,6 +760,27 @@ fn write_idgd_catalog(
         // card_count is computed by loading bitmap we just wrote and counting.
         let bmp_path = out.join("id_gd").join(format!("{id_gd}.roar"));
         let bmp = load_bitmap(&bmp_path)?;
+
+        let line_meta = |line: EffectLine| -> Result<Option<BitmapMeta>> {
+            let file = format!("{id_gd}_{}.roar", line.suffix());
+            let path = out.join("id_gd").join(&file);
+            if !path.exists() {
+                return Ok(None);
+            }
+            let bmp = load_bitmap(&path)?;
+            if bmp.is_empty() {
+                return Ok(None);
+            }
+            let bytes = fs::metadata(&path)
+                .with_context(|| format!("stat {}", path.display()))?
+                .len() as u64;
+            Ok(Some(BitmapMeta {
+                card_count: bmp.len(),
+                bitmap_bytes: bytes,
+                bitmap_file: file,
+            }))
+        };
+
         entries.push(IdGdCatalogEntry {
             id_gd,
             card_count: bmp.len(),
@@ -724,6 +788,10 @@ fn write_idgd_catalog(
             bitmap_file: format!("{id_gd}.roar"),
             element_type,
             translations,
+            m1: line_meta(EffectLine::M1)?,
+            m2: line_meta(EffectLine::M2)?,
+            m3: line_meta(EffectLine::M3)?,
+            ec: line_meta(EffectLine::Ec)?,
         });
     }
     let cat = IdGdCatalog {
