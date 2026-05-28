@@ -8,6 +8,7 @@ use roaring::RoaringBitmap;
 use serde::Serialize;
 
 use alt_indexer::bitmap::EffectLine;
+use alt_indexer::idgd_catalog::IdGdCatalogEntry;
 
 use crate::AppState;
 
@@ -19,14 +20,28 @@ pub struct CardsIter {
 }
 
 #[derive(Debug, Serialize)]
-pub struct CardRef {
+pub struct CardFaction {
+    pub code: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardV2 {
     pub reference: String,
+    pub main_cost: u8,
+    pub recall_cost: u8,
+    pub forest_power: u8,
+    pub mountain_power: u8,
+    pub ocean_power: u8,
+    pub faction: CardFaction,
+    pub main_effect: BTreeMap<String, String>,
+    pub echo_effect: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct CardsResponse {
     pub iter: CardsIter,
-    pub cards: Vec<CardRef>,
+    pub cards: Vec<CardV2>,
 }
 
 #[derive(Debug, Serialize)]
@@ -77,7 +92,7 @@ pub async fn get_cards_v2(
     let req = parse_request(&state, &params)?;
     let bitmap = build_bitmap(&state, &req.filters)?;
     let total = bitmap.len() as u64;
-    let (cards, next_cursor) = page_references(&state, &bitmap, req.cursor, req.limit)?;
+    let (cards, next_cursor) = page_cards_v2(&state, &bitmap, req.cursor, req.limit)?;
 
     Ok(Json(CardsResponse {
         iter: CardsIter {
@@ -299,14 +314,21 @@ fn bitmap_line(state: &AppState, line: EffectLine, id_gd: u32) -> RoaringBitmap 
         .unwrap_or_else(RoaringBitmap::new)
 }
 
-fn page_references(
+fn page_cards_v2(
     state: &AppState,
     bitmap: &RoaringBitmap,
     cursor: Option<u32>,
     limit: usize,
-) -> ApiResult<(Vec<CardRef>, Option<u32>)> {
+) -> ApiResult<(Vec<CardV2>, Option<u32>)> {
     let mut out = Vec::with_capacity(limit);
     let mut last_index: Option<u32> = None;
+
+    let idgd_by_id: BTreeMap<u32, &IdGdCatalogEntry> = state
+        .idgd_catalog()
+        .entries
+        .iter()
+        .map(|e| (e.id_gd, e))
+        .collect();
 
     for card_index in bitmap.iter() {
         if cursor.is_some_and(|c| card_index <= c) {
@@ -315,7 +337,24 @@ fn page_references(
         let reference = state
             .decode_reference(card_index)
             .map_err(|e| bad_request(format!("failed to decode reference for card_index {card_index}: {e}")))?;
-        out.push(CardRef { reference });
+
+        let view = state
+            .card_view(card_index)
+            .ok_or_else(|| bad_request(format!("missing compact record for card_index {card_index}")))?;
+
+        out.push(CardV2 {
+            reference,
+            main_cost: view.main_cost(),
+            recall_cost: view.recall_cost(),
+            forest_power: view.forest_power(),
+            mountain_power: view.mountain_power(),
+            ocean_power: view.ocean_power(),
+            faction: CardFaction {
+                code: faction_from_code(view.faction_code()),
+            },
+            main_effect: build_main_effect_localized(&idgd_by_id, &view),
+            echo_effect: build_echo_effect_localized(&idgd_by_id, &view),
+        });
         last_index = Some(card_index);
         if out.len() >= limit {
             break;
@@ -326,6 +365,125 @@ fn page_references(
     let next_cursor = if out.len() == limit { last_index } else { None };
 
     Ok((out, next_cursor))
+}
+
+fn faction_from_code(code: u8) -> String {
+    match code {
+        1 => "AX",
+        2 => "BR",
+        3 => "LY",
+        4 => "MU",
+        5 => "OR",
+        6 => "YZ",
+        _ => "UN",
+    }
+    .to_string()
+}
+
+fn build_main_effect_localized(
+    idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
+    view: &alt_indexer::compact::CompactCardView<'_>,
+) -> BTreeMap<String, String> {
+    let groups: [[u16; 3]; 3] = [
+        view.main_effect_group(0),
+        view.main_effect_group(1),
+        view.main_effect_group(2),
+    ];
+
+    let mut locales: BTreeMap<String, ()> = BTreeMap::new();
+    locales.insert("en_US".to_string(), ());
+    for [t, c, o] in groups {
+        for id in [t, c, o] {
+            if id == 0 {
+                continue;
+            }
+            if let Some(entry) = idgd_by_id.get(&(id as u32)) {
+                for k in entry.translations.keys() {
+                    locales.insert(k.clone(), ());
+                }
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    for locale in locales.keys() {
+        let mut lines: Vec<String> = Vec::new();
+        for [t, c, o] in groups {
+            if let Some(line) = build_effect_line_localized(idgd_by_id, [t, c, o], locale) {
+                lines.push(line);
+            }
+        }
+        if !lines.is_empty() {
+            out.insert(locale.clone(), lines.join("  "));
+        }
+    }
+    out
+}
+
+fn build_echo_effect_localized(
+    idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
+    view: &alt_indexer::compact::CompactCardView<'_>,
+) -> BTreeMap<String, String> {
+    let [t, c, o] = view.echo_effect();
+
+    let mut locales: BTreeMap<String, ()> = BTreeMap::new();
+    locales.insert("en_US".to_string(), ());
+    for id in [t, c, o] {
+        if id == 0 {
+            continue;
+        }
+        if let Some(entry) = idgd_by_id.get(&(id as u32)) {
+            for k in entry.translations.keys() {
+                locales.insert(k.clone(), ());
+            }
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    for locale in locales.keys() {
+        if let Some(line) = build_effect_line_localized(idgd_by_id, [t, c, o], locale) {
+            out.insert(locale.clone(), line);
+        }
+    }
+    out
+}
+
+fn build_effect_line_localized(
+    idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
+    [t, c, o]: [u16; 3],
+    locale: &str,
+) -> Option<String> {
+    if t == 0 && c == 0 && o == 0 {
+        return None;
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for id in [t, c, o] {
+        if id == 0 {
+            continue;
+        }
+        let text = idgd_by_id
+            .get(&(id as u32))
+            .map(|entry| pick_translation(&entry.translations, locale))
+            .unwrap_or_default();
+        if !text.is_empty() {
+            parts.push(text);
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" "))
+    }
+}
+
+fn pick_translation(map: &BTreeMap<String, alt_indexer::card::LocaleText>, locale: &str) -> String {
+    if let Some(t) = map.get(locale) {
+        return t.text.clone();
+    }
+    if let Some(t) = map.get("en_US") {
+        return t.text.clone();
+    }
+    map.values().next().map(|t| t.text.clone()).unwrap_or_default()
 }
 
 fn parse_u32(field: &str, s: &str) -> ApiResult<u32> {
@@ -522,17 +680,17 @@ mod tests {
         let req = parse_request(&state, &params).unwrap();
         let bmp = build_bitmap(&state, &req.filters).unwrap();
 
-        let (page1, cur1) = page_references(&state, &bmp, None, 1).unwrap();
+        let (page1, cur1) = page_cards_v2(&state, &bmp, None, 1).unwrap();
         assert_eq!(page1.len(), 1);
         assert_eq!(page1[0].reference, "ALT_TEST_B_AX_01_U_3"); // card_index 2 => unique_id 3
         assert_eq!(cur1, Some(2));
 
-        let (page2, cur2) = page_references(&state, &bmp, cur1, 1).unwrap();
+        let (page2, cur2) = page_cards_v2(&state, &bmp, cur1, 1).unwrap();
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].reference, "ALT_TEST_B_AX_01_U_6"); // card_index 5 => unique_id 6
         assert_eq!(cur2, Some(5));
 
-        let (page3, cur3) = page_references(&state, &bmp, cur2, 1).unwrap();
+        let (page3, cur3) = page_cards_v2(&state, &bmp, cur2, 1).unwrap();
         assert!(page3.is_empty());
         assert_eq!(cur3, None);
     }
