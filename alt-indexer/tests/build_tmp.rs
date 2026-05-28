@@ -60,6 +60,11 @@ fn build_query_decode_tmp_fixtures() {
     let result = query::query_id_gd(out.path(), "COREKS", 90, Some(5), false).expect("query");
     assert!(result.cardinality >= 1);
 
+    let card = query::query_refid_effect_text(out.path(), "COREKS", "ALT_COREKS_B_AX_06_U_5", "en_US")
+        .expect("query refid");
+    assert_eq!(card.reference, "ALT_COREKS_B_AX_06_U_5");
+    assert!(!card.effect_lines.is_empty());
+
     let idgd_text =
         std::fs::read_to_string(summary.output_dir.join("idgd_catalog.json")).expect("idgd catalog");
     let idgd: serde_json::Value = serde_json::from_str(&idgd_text).expect("parse idgd catalog");

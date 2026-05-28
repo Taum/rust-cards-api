@@ -1,3 +1,4 @@
+use crate::audit_missing;
 use crate::build;
 use crate::bench_query;
 use crate::decode;
@@ -63,26 +64,39 @@ pub enum Command {
         #[arg(long)]
         bit: u32,
     },
-    /// Query how many cards contain an idGd.
+    /// Query how many cards contain an idGd, or look up a single card by reference.
+    #[command(group(
+        clap::ArgGroup::new("query_target")
+            .required(true)
+            .multiple(false)
+            .args(["id_gd", "refid"])
+    ))]
     Query {
         #[arg(long)]
         index_dir: PathBuf,
         #[arg(long)]
         set: String,
         /// Comma-separated list of idGd values (e.g. `--id-gd 24,191,76`).
-        #[arg(long, value_delimiter = ',')]
+        #[arg(long, value_delimiter = ',', group = "query_target", conflicts_with = "refid")]
         id_gd: Vec<u32>,
+        /// Look up a single card by reference (e.g. `ALT_COREKS_B_AX_04_U_10`).
+        #[arg(
+            long,
+            group = "query_target",
+            conflicts_with_all = ["id_gd", "list", "show_effect", "whole_card"]
+        )]
+        refid: Option<String>,
         /// Decode and print up to N matching card references.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "refid")]
         list: Option<usize>,
         /// Show translated effect text instead of a table.
-        #[arg(long, default_value_t = false)]
+        #[arg(long, default_value_t = false, conflicts_with = "refid")]
         show_effect: bool,
         /// Locale key for effect translation (e.g. en_US, fr_FR).
         #[arg(long, default_value = "en_US")]
         locale: String,
         /// Use whole-card combined bitmaps (`{id}.roar`) instead of per-line sub-indexes.
-        #[arg(long, default_value_t = false)]
+        #[arg(long, default_value_t = false, conflicts_with = "refid")]
         whole_card: bool,
     },
     /// Merge multiple existing per-SET indexes into one merged index.
@@ -96,6 +110,17 @@ pub enum Command {
         /// Full output directory for merged index (files written directly under this folder).
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Find missing cards in gap-suspect families (max_unique_id != card_count).
+    AuditMissing {
+        /// Directory containing per-SET folders, e.g. `<index-dir>/<SET>/catalog.json`.
+        #[arg(long)]
+        index_dir: PathBuf,
+        #[arg(long)]
+        set: String,
+        /// Emit JSON keyed by `ALT_<SET>_B_<family_id>` with arrays of missing references.
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
     /// Benchmark random idGd queries against an existing index (preloads bitmaps + cards.bin).
     BenchQuery {
@@ -175,12 +200,18 @@ pub fn run() -> Result<()> {
             index_dir,
             set,
             id_gd,
+            refid,
             list,
             show_effect,
             locale,
             whole_card,
         } => {
-            if show_effect {
+            if let Some(refid) = refid {
+                let card = query::query_refid_effect_text(&index_dir, &set, &refid, &locale)?;
+                println!("query: 1 cards");
+                println!();
+                print_effect_card(&card);
+            } else if show_effect {
                 let result = query::query_id_gds_effect_text(
                     &index_dir, &set, &id_gd, list, &locale, whole_card,
                 )?;
@@ -194,15 +225,7 @@ pub fn run() -> Result<()> {
                 if !result.cards.is_empty() {
                     println!();
                     for card in &result.cards {
-                        println!("{}", card.reference);
-                        println!(
-                            "Cost: {} / {}          Power: O:{} / M:{} / F:{}",
-                            card.hand, card.reserve, card.o, card.m, card.f
-                        );
-                        for line in &card.effect_lines {
-                            println!("{line}");
-                        }
-                        println!("-----------------");
+                        print_effect_card(card);
                     }
                 }
             } else {
@@ -252,6 +275,13 @@ pub fn run() -> Result<()> {
                 summary.total_bit_span
             );
         }
+        Command::AuditMissing {
+            index_dir,
+            set,
+            json,
+        } => {
+            audit_missing::run(&index_dir, &set, json)?;
+        }
         Command::BenchQuery {
             index_dir,
             set,
@@ -279,4 +309,16 @@ pub fn run() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn print_effect_card(card: &query::EffectCard) {
+    println!("{}", card.reference);
+    println!(
+        "Cost: {} / {}          Power: O:{} / M:{} / F:{}",
+        card.hand, card.reserve, card.o, card.m, card.f
+    );
+    for line in &card.effect_lines {
+        println!("{line}");
+    }
+    println!("-----------------");
 }

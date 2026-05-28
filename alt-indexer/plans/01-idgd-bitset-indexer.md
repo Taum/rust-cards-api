@@ -183,7 +183,7 @@ cardElements[]
 ### Path parsing
 
 ```text
-json/(?P<set>[^/]+)/(?P<faction>[A-Z]{2})/(?P<familyNumber>\d{2})/ALT_(?P=set)_B_(?P=faction)_(?P=familyNumber)_U_(?P<uniqueId>\d+)\.json
+json/(?P<set>[^/]+)/(?P<faction>[A-Z]{2})/(?P<familyNumber>\d+)/ALT_(?P=set)_B_(?P=faction)_(?P=familyNumber)_U_(?P<uniqueId>\d+)\.json
 ```
 
 ## Output Layout

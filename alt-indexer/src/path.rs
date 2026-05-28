@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 const FACTION_ORDER: [&str; 6] = ["AX", "BR", "LY", "MU", "OR", "YZ"];
 
 static CARD_FILE_RE: OnceLock<regex::Regex> = OnceLock::new();
+static CARD_REFERENCE_RE: OnceLock<regex::Regex> = OnceLock::new();
 
 fn card_file_re() -> &'static regex::Regex {
     CARD_FILE_RE.get_or_init(|| {
@@ -13,6 +14,41 @@ fn card_file_re() -> &'static regex::Regex {
         )
         .expect("card file regex")
     })
+}
+
+fn card_reference_re() -> &'static regex::Regex {
+    CARD_REFERENCE_RE.get_or_init(|| {
+        regex::Regex::new(
+            r"^ALT_(?P<set>[^_]+(?:_[^_]+)*)_B_(?P<faction>[A-Z]{2})_(?P<family>\d+)_U_(?P<uid>\d+)$",
+        )
+        .expect("card reference regex")
+    })
+}
+
+fn parsed_from_captures(caps: &regex::Captures) -> Result<ParsedCardPath> {
+    let set = caps.name("set").unwrap().as_str().to_string();
+    let faction = caps.name("faction").unwrap().as_str().to_string();
+    let family_number = caps.name("family").unwrap().as_str().to_string();
+    let unique_id: u32 = caps
+        .name("uid")
+        .unwrap()
+        .as_str()
+        .parse()
+        .context("invalid UniqueID")?;
+    Ok(ParsedCardPath {
+        set,
+        faction,
+        family_number,
+        unique_id,
+    })
+}
+
+/// Parse a card reference: `ALT_<SET>_B_<faction>_<family>_U_<uid>`.
+pub fn parse_card_reference(reference: &str) -> Result<ParsedCardPath> {
+    let caps = card_reference_re()
+        .captures(reference)
+        .with_context(|| format!("reference does not match card pattern: {reference}"))?;
+    parsed_from_captures(&caps)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,22 +113,17 @@ pub fn parse_card_path(path: &Path, expected_set: &str) -> Result<ParsedCardPath
         .captures(file_name)
         .with_context(|| format!("file name does not match card pattern: {file_name}"))?;
 
-    let set = caps.name("set").unwrap().as_str().to_string();
-    if set != expected_set {
+    let parsed = parsed_from_captures(&caps)?;
+    if parsed.set != expected_set {
         bail!(
-            "set mismatch: path has {set}, expected {expected_set} ({})",
+            "set mismatch: path has {}, expected {expected_set} ({})",
+            parsed.set,
             path.display()
         );
     }
-
-    let faction = caps.name("faction").unwrap().as_str().to_string();
-    let family_number = caps.name("family").unwrap().as_str().to_string();
-    let unique_id: u32 = caps
-        .name("uid")
-        .unwrap()
-        .as_str()
-        .parse()
-        .context("invalid UniqueID")?;
+    let set = parsed.set.clone();
+    let faction = parsed.faction.clone();
+    let family_number = parsed.family_number.clone();
 
     let components: Vec<_> = path.components().collect();
     let json_idx = components
@@ -121,12 +152,7 @@ pub fn parse_card_path(path: &Path, expected_set: &str) -> Result<ParsedCardPath
         );
     }
 
-    Ok(ParsedCardPath {
-        set,
-        faction,
-        family_number,
-        unique_id,
-    })
+    Ok(parsed)
 }
 
 pub fn json_set_root(dataset_root: &Path, set: &str) -> PathBuf {
@@ -161,5 +187,25 @@ mod tests {
     fn foiler_rejected() {
         let path = Path::new("json/COREKS/NE/00/ALT_COREKS_B_NE_FOILER_U.json");
         assert!(parse_card_path(path, "COREKS").is_err());
+    }
+
+    #[test]
+    fn parse_card_reference_example() {
+        let parsed = parse_card_reference("ALT_COREKS_B_AX_04_U_10").unwrap();
+        assert_eq!(parsed.set, "COREKS");
+        assert_eq!(parsed.faction, "AX");
+        assert_eq!(parsed.family_number, "04");
+        assert_eq!(parsed.unique_id, 10);
+        assert_eq!(parsed.reference(), "ALT_COREKS_B_AX_04_U_10");
+    }
+
+    #[test]
+    fn parse_card_reference_rejects_json_suffix() {
+        assert!(parse_card_reference("ALT_COREKS_B_AX_04_U_10.json").is_err());
+    }
+
+    #[test]
+    fn parse_card_reference_rejects_invalid() {
+        assert!(parse_card_reference("not-a-reference").is_err());
     }
 }

@@ -163,6 +163,36 @@ impl Catalog {
         Ok(())
     }
 
+    /// Resolve a card reference to its global bit index.
+    pub fn lookup_bit(&self, parsed: &ParsedCardPath) -> Result<u32> {
+        let reference = parsed.reference();
+        let matches: Vec<_> = self
+            .families
+            .iter()
+            .filter(|f| {
+                f.faction == parsed.faction
+                    && f.family_number == parsed.family_number
+                    && f.source_set.as_deref().unwrap_or(&self.set) == parsed.set
+            })
+            .collect();
+
+        let family = match matches.len() {
+            0 => bail!("reference not found in catalog: {reference}"),
+            1 => matches[0],
+            _ => bail!("ambiguous reference in catalog: {reference}"),
+        };
+
+        if parsed.unique_id > family.max_unique_id {
+            bail!(
+                "reference {reference} falls in padding after family {} (max UniqueID {})",
+                family.family_id,
+                family.max_unique_id
+            );
+        }
+
+        Ok(family.start_bit + parsed.unique_id - 1)
+    }
+
     pub fn decode_bit(&self, bit: u32) -> Result<DecodedCard> {
         let family = self
             .families
@@ -241,6 +271,11 @@ mod tests {
         assert_eq!(d.family_id, "AX_05");
         assert_eq!(d.unique_id, 6146);
         assert_eq!(d.reference, "ALT_COREKS_B_AX_05_U_6146");
+
+        let p = crate::path::parse_card_reference("ALT_COREKS_B_AX_05_U_6146")?;
+        let bit = catalog.lookup_bit(&p)?;
+        assert_eq!(bit, 10345);
+        assert_eq!(catalog.decode_bit(bit)?.reference, "ALT_COREKS_B_AX_05_U_6146");
         Ok(())
     }
 }

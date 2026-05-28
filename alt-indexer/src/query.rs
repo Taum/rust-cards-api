@@ -2,7 +2,8 @@ use crate::bitmap::{BitmapStore, EffectLine};
 use crate::catalog::Catalog;
 use crate::compact::CompactCardView;
 use crate::idgd_catalog::IdGdCatalog;
-use anyhow::{Context, Result};
+use crate::path::parse_card_reference;
+use anyhow::{bail, Context, Result};
 use roaring::RoaringBitmap;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -67,6 +68,45 @@ pub fn query_id_gd_effect_text(
     whole_card: bool,
 ) -> Result<EffectQueryResult> {
     query_id_gds_effect_text(index_dir, set, &[id_gd], list_limit, locale, whole_card)
+}
+
+/// Look up a single card by reference and return translated effect text.
+pub fn query_refid_effect_text(
+    index_dir: &Path,
+    set: &str,
+    refid: &str,
+    locale: &str,
+) -> Result<EffectCard> {
+    let parsed = parse_card_reference(refid)?;
+    let reference = parsed.reference();
+
+    let set_dir = index_dir.join(set);
+    let catalog = Catalog::load(&set_dir.join("catalog.json"))?;
+    let bit = catalog.lookup_bit(&parsed)?;
+
+    let cards_bin_path = set_dir.join("cards.bin");
+    let cards_data = std::fs::read(&cards_bin_path)
+        .with_context(|| format!("read {}", cards_bin_path.display()))?;
+
+    let view = CompactCardView::from_data(&cards_data, bit)
+        .with_context(|| format!("cards.bin has no record at bit {bit}"))?;
+
+    if view.faction_code() == 0 && record_tail_nonzero(view.as_bytes()) {
+        bail!("corrupt zero-faction record at {reference}");
+    }
+    if view.faction_code() == 0 {
+        bail!("card not indexed at {reference}");
+    }
+
+    let idgd_catalog_path = set_dir.join("idgd_catalog.json");
+    let idgd_catalog_text = std::fs::read_to_string(&idgd_catalog_path)
+        .with_context(|| format!("read {}", idgd_catalog_path.display()))?;
+    let idgd_catalog: IdGdCatalog = serde_json::from_str(&idgd_catalog_text)
+        .with_context(|| format!("parse {}", idgd_catalog_path.display()))?;
+    let text_by_id = load_translation_map(&idgd_catalog, locale);
+
+    let decoded = catalog.decode_bit(bit)?;
+    effect_card_from_view(&decoded.reference, &view, &text_by_id)
 }
 
 pub fn query_id_gds(
@@ -182,37 +222,7 @@ pub fn query_id_gds_effect_text(
             Some(v) => v,
             None => continue,
         };
-
-        let hand = view.main_cost();
-        let reserve = view.recall_cost();
-        let m = view.mountain_power();
-        let o = view.ocean_power();
-        let f = view.forest_power();
-
-        let mut effect_lines = Vec::new();
-
-        for g in 0..3 {
-            let [t, c, e] = view.main_effect_group(g);
-            let line = build_effect_line(t, c, e, &text_by_id);
-            if let Some(line) = line {
-                effect_lines.push(line);
-            }
-        }
-
-        let [t, c, e] = view.echo_effect();
-        if let Some(line) = build_effect_line(t, c, e, &text_by_id) {
-            effect_lines.push(line);
-        }
-
-        cards.push(EffectCard {
-            reference: decoded.reference,
-            hand,
-            reserve,
-            m,
-            o,
-            f,
-            effect_lines,
-        });
+        cards.push(effect_card_from_view(&decoded.reference, &view, &text_by_id)?);
     }
 
     Ok(EffectQueryResult {
@@ -590,6 +600,51 @@ fn warn_if_missing_per_line_bitmaps(id_gd_dir: &Path, buckets: &IdGdQueryBuckets
             "         Rebuild the index (alt-indexer build) or pass --whole-card to use combined {{id}}.roar files."
         );
     }
+}
+
+fn load_translation_map(idgd_catalog: &IdGdCatalog, locale: &str) -> BTreeMap<u32, String> {
+    let mut text_by_id = BTreeMap::new();
+    for entry in &idgd_catalog.entries {
+        let t = pick_translation(&entry.translations, locale);
+        if !t.is_empty() {
+            text_by_id.insert(entry.id_gd, t);
+        }
+    }
+    text_by_id
+}
+
+fn effect_card_from_view(
+    reference: &str,
+    view: &CompactCardView<'_>,
+    text_by_id: &BTreeMap<u32, String>,
+) -> Result<EffectCard> {
+    let mut effect_lines = Vec::new();
+
+    for g in 0..3 {
+        let [t, c, e] = view.main_effect_group(g);
+        if let Some(line) = build_effect_line(t, c, e, text_by_id) {
+            effect_lines.push(line);
+        }
+    }
+
+    let [t, c, e] = view.echo_effect();
+    if let Some(line) = build_effect_line(t, c, e, text_by_id) {
+        effect_lines.push(line);
+    }
+
+    Ok(EffectCard {
+        reference: reference.to_string(),
+        hand: view.main_cost(),
+        reserve: view.recall_cost(),
+        m: view.mountain_power(),
+        o: view.ocean_power(),
+        f: view.forest_power(),
+        effect_lines,
+    })
+}
+
+fn record_tail_nonzero(record: &[u8; crate::compact::RECORD_SIZE]) -> bool {
+    record[1..].iter().any(|b| *b != 0)
 }
 
 fn pick_translation(map: &BTreeMap<String, crate::card::LocaleText>, locale: &str) -> String {

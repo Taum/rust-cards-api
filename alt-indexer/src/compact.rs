@@ -272,4 +272,8 @@ impl<'a> CompactCardView<'a> {
     pub fn echo_effect(&self) -> [u16; 3] {
         [self.id_gd(9), self.id_gd(10), self.id_gd(11)]
     }
+
+    pub fn as_bytes(&self) -> &'a [u8; RECORD_SIZE] {
+        self.buf
+    }
 }

@@ -1,3 +1,4 @@
+pub mod audit_missing;
 pub mod bitmap;
 pub mod build;
 pub mod bench_query;
