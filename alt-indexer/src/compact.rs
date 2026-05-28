@@ -1,7 +1,6 @@
+use crate::card::{CardEffect, CardJson};
 use crate::path::ParsedCardPath;
 use anyhow::{Context, Result};
-use serde::Deserialize;
-use std::fs;
 use std::path::Path;
 
 /// Fixed-size compact representation of a card, matching the 32-byte record layout.
@@ -19,83 +18,9 @@ pub struct CompactCardFields {
 
 pub const RECORD_SIZE: usize = 32;
 
-// --- JSON view for compact extraction ---
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardJson {
-    #[serde(default)]
-    main_faction: Option<MainFaction>,
-    #[serde(default)]
-    card_elements: Vec<CardElement>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MainFaction {
-    #[serde(default)]
-    reference: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardElement {
-    #[serde(default)]
-    card_element_type: Option<CardElementType>,
-    #[serde(default)]
-    value: Option<String>,
-    #[serde(default)]
-    card_effect_displays: Vec<CardEffectDisplay>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardElementType {
-    #[serde(default)]
-    reference: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardEffectDisplay {
-    #[serde(default)]
-    card_effect: Option<CardEffect>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardEffect {
-    #[serde(default)]
-    card_effect_elements: Vec<CardEffectElement>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CardEffectElement {
-    id_gd: u32,
-    #[serde(rename = "type")]
-    element_type: Option<String>,
-}
-
-fn read_card(path: &Path) -> Result<CardJson> {
-    let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    let card: CardJson =
-        serde_json::from_str(&text).with_context(|| format!("parse JSON {}", path.display()))?;
-    Ok(card)
-}
-
-/// Extract the compact fields needed for `cards.bin` from one card JSON.
-pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Result<CompactCardFields> {
-    let card = read_card(path)?;
-
-    // Faction: prefer mainFaction.reference, fall back to path faction, then 0.
-    let faction_str = card
-        .main_faction
-        .as_ref()
-        .and_then(|mf| mf.reference.as_deref())
-        .unwrap_or(parsed_path.faction.as_str());
-
-    let faction_code = match faction_str {
+/// Map `mainFaction.reference` to the on-disk faction code (`0` = unknown).
+pub fn faction_code_from_reference(reference: &str) -> u8 {
+    match reference {
         "AX" => 1,
         "BR" => 2,
         "LY" => 3,
@@ -103,16 +28,25 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
         "OR" => 5,
         "YZ" => 6,
         _ => 0,
-    };
+    }
+}
 
-    // Stats: default 0, override from cardElements by cardElementType.reference
+/// Extract compact fields from an already-parsed card.
+pub fn compact_fields_from_card(card: &CardJson) -> CompactCardFields {
+    // Faction: mainFaction.reference only (not path faction).
+    let faction_code = card
+        .main_faction
+        .as_ref()
+        .and_then(|mf| mf.reference.as_deref())
+        .map(faction_code_from_reference)
+        .unwrap_or(0);
+
     let mut main_cost: u8 = 0;
     let mut recall_cost: u8 = 0;
     let mut mountain_power: u8 = 0;
     let mut ocean_power: u8 = 0;
     let mut forest_power: u8 = 0;
 
-    // Effect groups
     let mut main_effect: [[u16; 3]; 3] = [[0; 3]; 3];
     let mut echo_effect: [u16; 3] = [0; 3];
 
@@ -160,7 +94,6 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
                 }
             }
             Some("MAIN_EFFECT") => {
-                // Up to 3 groups, each from one display, in order
                 for (group_idx, display) in element.card_effect_displays.iter().take(3).enumerate()
                 {
                     if let Some(effect) = &display.card_effect {
@@ -169,7 +102,6 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
                 }
             }
             Some("ECHO_EFFECT") => {
-                // Single aggregate group across all displays
                 let mut trigger: u16 = 0;
                 let mut condition: u16 = 0;
                 let mut output: u16 = 0;
@@ -178,10 +110,7 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
                     if let Some(effect) = &display.card_effect {
                         for node in &effect.card_effect_elements {
                             let id = node.id_gd as u16;
-                            let kind = node
-                                .element_type
-                                .as_deref()
-                                .unwrap_or_default();
+                            let kind = node.element_type.as_deref().unwrap_or_default();
                             match kind {
                                 "TRIGGER" if trigger == 0 => trigger = id,
                                 "CONDITION" if condition == 0 => condition = id,
@@ -198,7 +127,7 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
         }
     }
 
-    Ok(CompactCardFields {
+    CompactCardFields {
         faction_code,
         main_cost,
         recall_cost,
@@ -207,7 +136,14 @@ pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Resu
         forest_power,
         main_effect,
         echo_effect,
-    })
+    }
+}
+
+/// Read, parse, and extract compact fields (convenience for callers that only need compact data).
+pub fn extract_compact_fields(path: &Path, parsed_path: &ParsedCardPath) -> Result<CompactCardFields> {
+    let _ = parsed_path;
+    let card = crate::card::load_card(path, None)?;
+    Ok(compact_fields_from_card(&card))
 }
 
 fn set_group_from_effect(slot: &mut [u16; 3], effect: &CardEffect) {
@@ -236,7 +172,6 @@ fn set_group_from_effect(slot: &mut [u16; 3], effect: &CardEffect) {
 pub fn encode_record(fields: &CompactCardFields) -> [u8; RECORD_SIZE] {
     let mut buf = [0u8; RECORD_SIZE];
 
-    // Header: 6 bytes
     buf[0] = fields.faction_code;
     buf[1] = fields.main_cost;
     buf[2] = fields.recall_cost;
@@ -244,12 +179,11 @@ pub fn encode_record(fields: &CompactCardFields) -> [u8; RECORD_SIZE] {
     buf[4] = fields.ocean_power;
     buf[5] = fields.forest_power;
 
-    // idGd block: 12 × u16, little-endian
     let ids: [u16; 12] = [
         fields.main_effect[0][0], fields.main_effect[0][1], fields.main_effect[0][2],
         fields.main_effect[1][0], fields.main_effect[1][1], fields.main_effect[1][2],
         fields.main_effect[2][0], fields.main_effect[2][1], fields.main_effect[2][2],
-        fields.echo_effect[0],    fields.echo_effect[1],    fields.echo_effect[2],
+        fields.echo_effect[0], fields.echo_effect[1], fields.echo_effect[2],
     ];
 
     let mut offset = 6;
@@ -260,7 +194,6 @@ pub fn encode_record(fields: &CompactCardFields) -> [u8; RECORD_SIZE] {
         offset += 2;
     }
 
-    // bytes 30–31 are reserved and remain zero
     buf
 }
 
@@ -326,7 +259,6 @@ impl<'a> CompactCardView<'a> {
         self.buf[5]
     }
 
-    /// Returns the 16-bit idGd at slot idx (0..11).
     pub fn id_gd(&self, idx: usize) -> u16 {
         let base = 6 + idx * 2;
         u16::from_le_bytes([self.buf[base], self.buf[base + 1]])
@@ -341,5 +273,3 @@ impl<'a> CompactCardView<'a> {
         [self.id_gd(9), self.id_gd(10), self.id_gd(11)]
     }
 }
-
-

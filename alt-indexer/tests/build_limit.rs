@@ -28,6 +28,7 @@ fn discovery_stops_at_limit() {
         out.path(),
         BuildOptions {
             file_limit: Some(10),
+            profile: false,
         },
     )
     .expect("build");

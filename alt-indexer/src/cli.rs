@@ -28,6 +28,9 @@ pub enum Command {
         /// Stop discovery and indexing after this many files (for testing).
         #[arg(long)]
         limit: Option<usize>,
+        /// Print build phase timings (read, parse, process, write). Also enabled by ALT_INDEXER_PROFILE=1.
+        #[arg(long)]
+        profile: bool,
     },
     /// Decode a global bit index to a card reference.
     Decode {
@@ -59,12 +62,21 @@ pub enum Command {
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Build { root, set, out, limit } => {
+        Command::Build {
+            root,
+            set,
+            out,
+            limit,
+            profile,
+        } => {
             let summary = build::build(
                 &root,
                 &set,
                 &out,
-                build::BuildOptions { file_limit: limit },
+                build::BuildOptions {
+                    file_limit: limit,
+                    profile,
+                },
             )?;
             let limit_note = match summary.file_limit {
                 Some(n) if summary.stopped_early => format!(" (limit {n})"),

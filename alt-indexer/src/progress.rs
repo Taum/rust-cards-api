@@ -1,3 +1,4 @@
+use crate::profile::{PhaseRollingWindow, PHASE_WINDOW};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -25,7 +26,6 @@ impl RateTracker {
         self.processed += 1;
     }
 
-    /// Files processed per second since the previous tick.
     fn tick_rate(&mut self) -> f64 {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_tick).as_secs_f64();
@@ -46,6 +46,11 @@ impl RateTracker {
         let remaining = self.total.saturating_sub(self.processed);
         Some((remaining as f64 / rate_per_sec).ceil() as u64)
     }
+}
+
+struct BuildProgressState {
+    rate: RateTracker,
+    phases: PhaseRollingWindow,
 }
 
 pub struct DiscoveryProgress {
@@ -85,28 +90,34 @@ impl DiscoveryProgress {
 
 pub struct BuildProgress {
     bar: ProgressBar,
-    tracker: Arc<Mutex<RateTracker>>,
+    state: Arc<Mutex<BuildProgressState>>,
+    show_phase_line: bool,
     _tick_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl BuildProgress {
     pub fn start(total: usize) -> Self {
         let total = total as u64;
+        let show_phase_line = progress_enabled();
         let bar = ProgressBar::new(total);
         bar.set_draw_target(progress_target());
         bar.set_style(
             ProgressStyle::with_template(
-                "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent:>3}%) {msg}",
+                "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent:>3}%)\n{msg}",
             )
             .expect("build progress template")
             .progress_chars("█▓▒░  "),
         );
         bar.set_message("starting…");
 
-        let tracker = Arc::new(Mutex::new(RateTracker::new(total)));
+        let state = Arc::new(Mutex::new(BuildProgressState {
+            rate: RateTracker::new(total),
+            phases: PhaseRollingWindow::new(PHASE_WINDOW),
+        }));
+
         let tick_thread = if progress_enabled() {
             let bar_tick = bar.clone();
-            let tracker_tick = Arc::clone(&tracker);
+            let state_tick = Arc::clone(&state);
             Some(std::thread::spawn(move || {
                 while !bar_tick.is_finished() {
                     std::thread::sleep(Duration::from_secs(1));
@@ -114,13 +125,22 @@ impl BuildProgress {
                         break;
                     }
                     let msg = {
-                        let mut t = tracker_tick.lock().expect("rate tracker lock");
-                        let rate = t.tick_rate();
-                        let eta = format_eta(t.eta_secs(rate));
-                        format!(
-                            "{}/{} total | {rate:.0} files/s (last 1s) | ETA {eta}",
-                            t.processed, t.total
-                        )
+                        let mut s = state_tick.lock().expect("build progress lock");
+                        let rate = s.rate.tick_rate();
+                        let eta = format_eta(s.rate.eta_secs(rate));
+                        let line1 = format!(
+                            "{}/{} cards | {rate:.0} files/s (last 1s) | ETA {eta}",
+                            s.rate.processed, s.rate.total
+                        );
+                        if s.phases.sample_count() > 0 {
+                            let (read_ms, parse_ms, process_ms) = s.phases.avg_ms_per_card();
+                            let line2 = format!(
+                                "read {read_ms:.1}ms | parse {parse_ms:.1}ms | process {process_ms:.1}ms per card (5s avg)"
+                            );
+                            format!("{line1}\n{line2}")
+                        } else {
+                            line1
+                        }
                     };
                     bar_tick.set_message(msg);
                 }
@@ -131,14 +151,27 @@ impl BuildProgress {
 
         Self {
             bar,
-            tracker,
+            state,
+            show_phase_line,
             _tick_thread: tick_thread,
         }
     }
 
+    pub fn tracks_phases(&self) -> bool {
+        self.show_phase_line
+    }
+
+    pub fn record_card_phases(&self, read_ns: u64, parse_ns: u64, process_ns: u64) {
+        if !self.show_phase_line {
+            return;
+        }
+        let mut s = self.state.lock().expect("build progress lock");
+        s.phases.record(read_ns, parse_ns, process_ns);
+    }
+
     pub fn inc(&self) {
-        let mut t = self.tracker.lock().expect("rate tracker lock");
-        t.inc();
+        let mut s = self.state.lock().expect("build progress lock");
+        s.rate.inc();
         self.bar.inc(1);
     }
 
@@ -168,16 +201,16 @@ impl WriteProgress {
     }
 }
 
+pub fn progress_enabled() -> bool {
+    std::io::IsTerminal::is_terminal(&std::io::stderr())
+}
+
 fn progress_target() -> ProgressDrawTarget {
     if progress_enabled() {
         ProgressDrawTarget::stderr()
     } else {
         ProgressDrawTarget::hidden()
     }
-}
-
-fn progress_enabled() -> bool {
-    std::io::IsTerminal::is_terminal(&std::io::stderr())
 }
 
 fn format_eta(secs: Option<u64>) -> String {

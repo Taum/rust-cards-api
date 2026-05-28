@@ -8,6 +8,8 @@ pub mod crawl;
 pub mod decode;
 pub mod idgd_catalog;
 pub mod path;
+pub mod profile;
 pub mod progress;
 pub mod query;
+pub mod faction_index;
 pub mod stat_index;

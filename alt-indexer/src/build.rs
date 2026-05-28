@@ -1,14 +1,16 @@
 use crate::bitmap::BitmapStore;
-use crate::card::parse_card_effects;
+use crate::card::{effects_from_card, CardJson};
 use crate::catalog::{Catalog, CatalogBuilder};
-use crate::compact::{extract_compact_fields, write_compact_records, CompactCardFields};
+use crate::compact::{compact_fields_from_card, write_compact_records, CompactCardFields};
+use crate::crawl::{discover_card_files, CardFile, DiscoverOptions};
+use crate::faction_index::{FactionIndex, FactionIndexBuilder};
 use crate::idgd_catalog::IdGdCatalogBuilder;
-use crate::stat_index::{StatIndex, StatIndexBuilder};
-use crate::crawl::{discover_card_files, DiscoverOptions};
+use crate::profile::{profile_enabled, BuildProfile};
 use crate::progress::{BuildProgress, DiscoveryProgress, WriteProgress};
+use crate::stat_index::{StatIndex, StatIndexBuilder};
 use anyhow::Result;
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize)]
@@ -27,6 +29,16 @@ pub struct Manifest {
 
 pub struct BuildOptions {
     pub file_limit: Option<usize>,
+    pub profile: bool,
+}
+
+impl Default for BuildOptions {
+    fn default() -> Self {
+        Self {
+            file_limit: None,
+            profile: false,
+        }
+    }
 }
 
 pub fn build(
@@ -36,43 +48,62 @@ pub fn build(
     options: BuildOptions,
 ) -> Result<BuildSummary> {
     let limit = options.file_limit;
+    let profiling = profile_enabled(options.profile);
+    let mut profile: Option<BuildProfile> = profiling.then(BuildProfile::default);
+
     let discovery = DiscoveryProgress::start();
 
-    let discovered = discover_card_files(
-        dataset_root,
-        set,
-        DiscoverOptions {
-            max_files: limit,
-        },
-        Some(&discovery),
-    )?;
+    let discovered = match profile.as_mut() {
+        Some(p) => {
+            let (result, ns) = BuildProfile::time(|| {
+                discover_card_files(
+                    dataset_root,
+                    set,
+                    DiscoverOptions { max_files: limit },
+                    Some(&discovery),
+                )
+            });
+            p.discovery_ns = ns;
+            result?
+        }
+        None => {
+            discover_card_files(
+                dataset_root,
+                set,
+                DiscoverOptions { max_files: limit },
+                Some(&discovery),
+            )?
+        }
+    };
 
     let files = discovered.files;
     let total_files = files.len();
     discovery.finish(total_files, limit, discovered.stopped_early);
 
     let progress = BuildProgress::start(total_files);
+    let measure_phases = progress.tracks_phases() || profiling;
     let mut catalog_builder = CatalogBuilder::new(set);
     let mut bitmaps = BitmapStore::new();
     let mut idgd_catalog_builder = IdGdCatalogBuilder::new();
     let mut compact_cards: Vec<(u32, CompactCardFields)> = Vec::with_capacity(total_files);
     let mut stat_index = StatIndexBuilder::new();
+    let mut faction_index = FactionIndexBuilder::new();
 
     for file in &files {
-        let card_index = catalog_builder.on_card(&file.parsed)?;
-
-        // idGd bitmaps and catalog
-        let occurrences = parse_card_effects(&file.path)?;
-        for occ in &occurrences {
-            idgd_catalog_builder.record_first(occ);
-            bitmaps.insert(occ.id_gd, card_index);
+        let phases = index_one_card(
+            file,
+            &mut catalog_builder,
+            &mut bitmaps,
+            &mut idgd_catalog_builder,
+            &mut compact_cards,
+            &mut stat_index,
+            &mut faction_index,
+            profile.as_mut(),
+            measure_phases,
+        )?;
+        if let Some((read_ns, parse_ns, process_ns)) = phases {
+            progress.record_card_phases(read_ns, parse_ns, process_ns);
         }
-
-        // compact card table + stat bitmaps
-        let compact = extract_compact_fields(&file.path, &file.parsed)?;
-        stat_index.insert(card_index, &compact);
-        compact_cards.push((card_index, compact));
-
         progress.inc();
     }
 
@@ -83,22 +114,163 @@ pub fn build(
 
     let write_progress = WriteProgress::start();
     let set_out = out.join(set);
+
+    match profile.as_mut() {
+        Some(p) => {
+            let (_, ns) = BuildProfile::time(|| {
+                write_index_outputs(
+                    set,
+                    dataset_root,
+                    &set_out,
+                    limit,
+                    &catalog,
+                    &bitmaps,
+                    idgd_catalog_builder,
+                    compact_cards,
+                    stat_index,
+                    faction_index,
+                )
+            });
+            p.write_ns = ns;
+            p.cards_indexed = catalog.total_cards_indexed();
+        }
+        None => {
+            write_index_outputs(
+                set,
+                dataset_root,
+                &set_out,
+                limit,
+                &catalog,
+                &bitmaps,
+                idgd_catalog_builder,
+                compact_cards,
+                stat_index,
+                faction_index,
+            )?;
+        }
+    }
+
+    write_progress.finish();
+
+    let id_gd_count = bitmaps.len();
+
+    if let Some(p) = profile {
+        p.print_report();
+    }
+
+    Ok(BuildSummary {
+        catalog,
+        output_dir: set_out,
+        files_processed: total_files,
+        id_gd_count,
+        file_limit: limit,
+        stopped_early: discovered.stopped_early,
+    })
+}
+
+/// Per-card phase timings `(read_ns, parse_ns, process_ns)` when `measure_phases` is true.
+fn index_one_card(
+    file: &CardFile,
+    catalog_builder: &mut CatalogBuilder,
+    bitmaps: &mut BitmapStore,
+    idgd_catalog_builder: &mut IdGdCatalogBuilder,
+    compact_cards: &mut Vec<(u32, CompactCardFields)>,
+    stat_index: &mut StatIndexBuilder,
+    faction_index: &mut FactionIndexBuilder,
+    mut profile: Option<&mut BuildProfile>,
+    measure_phases: bool,
+) -> Result<Option<(u64, u64, u64)>> {
+    let card_index = catalog_builder.on_card(&file.parsed)?;
+    let (card, load_timings) = crate::card::load_card_timed(
+        &file.path,
+        profile.as_deref_mut(),
+        measure_phases,
+    )?;
+
+    let mut process = || {
+        apply_card_index(
+            card_index,
+            &card,
+            bitmaps,
+            idgd_catalog_builder,
+            compact_cards,
+            stat_index,
+            faction_index,
+        );
+    };
+
+    let process_ns = if measure_phases || profile.is_some() {
+        let ((), ns) = BuildProfile::time(&mut process);
+        if let Some(p) = profile.as_deref_mut() {
+            p.process_ns += ns;
+        }
+        ns
+    } else {
+        process();
+        0
+    };
+
+    if measure_phases {
+        Ok(Some((
+            load_timings.read_ns,
+            load_timings.parse_ns,
+            process_ns,
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
+fn apply_card_index(
+    card_index: u32,
+    card: &CardJson,
+    bitmaps: &mut BitmapStore,
+    idgd_catalog_builder: &mut IdGdCatalogBuilder,
+    compact_cards: &mut Vec<(u32, CompactCardFields)>,
+    stat_index: &mut StatIndexBuilder,
+    faction_index: &mut FactionIndexBuilder,
+) {
+    let occurrences = effects_from_card(card);
+    for occ in &occurrences {
+        idgd_catalog_builder.record_first(occ);
+        bitmaps.insert(occ.id_gd, card_index);
+    }
+    let compact = compact_fields_from_card(card);
+    stat_index.insert(card_index, &compact);
+    faction_index.insert(card_index, &compact);
+    compact_cards.push((card_index, compact));
+}
+
+fn write_index_outputs(
+    set: &str,
+    dataset_root: &Path,
+    set_out: &Path,
+    limit: Option<usize>,
+    catalog: &Catalog,
+    bitmaps: &BitmapStore,
+    idgd_catalog_builder: IdGdCatalogBuilder,
+    compact_cards: Vec<(u32, CompactCardFields)>,
+    stat_index: StatIndexBuilder,
+    faction_index: FactionIndexBuilder,
+) -> Result<()> {
     let id_gd_dir = set_out.join("id_gd");
-    fs_create_dir_all(&set_out)?;
+    fs_create_dir_all(set_out)?;
     catalog.save(&set_out.join("catalog.json"))?;
     let bitmap_bytes = bitmaps.write_dir(&id_gd_dir)?;
-    let idgd_catalog = idgd_catalog_builder.build(set, &bitmaps, &bitmap_bytes);
+    let idgd_catalog = idgd_catalog_builder.build(set, bitmaps, &bitmap_bytes);
     IdGdCatalogBuilder::save(&idgd_catalog, &set_out.join("idgd_catalog.json"))?;
 
-    // Write compact card table next to catalog.json
     write_compact_records(&set_out.join("cards.bin"), catalog.total_bit_span, &compact_cards)?;
 
     let stat_index = stat_index.into_index();
-    let stats_dir = set_out.join("stats");
-    stat_index.write_dir(&stats_dir)?;
-    let stats_summary =
-        stat_index.build_summary(set, catalog.total_cards_indexed());
+    stat_index.write_dir(&set_out.join("stats"))?;
+    let stats_summary = stat_index.build_summary(set, catalog.total_cards_indexed());
     StatIndex::save_summary(&stats_summary, &set_out.join("stats_summary.json"))?;
+
+    let faction_index = faction_index.into_index();
+    faction_index.write_dir(&set_out.join("factions"))?;
+    let factions_summary = faction_index.build_summary(set, catalog.total_cards_indexed());
+    FactionIndex::save_summary(&factions_summary, &set_out.join("factions_summary.json"))?;
 
     let built_at_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -122,21 +294,12 @@ pub fn build(
     };
     let manifest_text = serde_json::to_string_pretty(&manifest)?;
     std::fs::write(set_out.join("manifest.json"), manifest_text)?;
-    write_progress.finish();
-
-    Ok(BuildSummary {
-        catalog,
-        output_dir: set_out,
-        files_processed: total_files,
-        id_gd_count: manifest.id_gd_count,
-        file_limit: limit,
-        stopped_early: discovered.stopped_early,
-    })
+    Ok(())
 }
 
 pub struct BuildSummary {
     pub catalog: Catalog,
-    pub output_dir: std::path::PathBuf,
+    pub output_dir: PathBuf,
     pub files_processed: usize,
     pub id_gd_count: usize,
     pub file_limit: Option<usize>,

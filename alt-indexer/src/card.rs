@@ -1,3 +1,4 @@
+use crate::profile::BuildProfile;
 use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
@@ -5,45 +6,67 @@ use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
 
+/// Parsed card JSON used for idGd indexing and compact field extraction.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CardJson {
+pub struct CardJson {
     #[serde(default)]
-    card_elements: Vec<CardElement>,
+    pub main_faction: Option<MainFaction>,
+    #[serde(default)]
+    pub card_elements: Vec<CardElement>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CardElement {
+pub struct MainFaction {
     #[serde(default)]
-    card_effect_displays: Vec<CardEffectDisplay>,
+    pub reference: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CardEffectDisplay {
+pub struct CardElement {
     #[serde(default)]
-    card_effect: Option<CardEffect>,
+    pub card_element_type: Option<CardElementType>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub card_effect_displays: Vec<CardEffectDisplay>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CardEffect {
+pub struct CardElementType {
     #[serde(default)]
-    card_effect_elements: Vec<CardEffectElement>,
+    pub reference: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CardEffectElement {
-    id_gd: u32,
+pub struct CardEffectDisplay {
+    #[serde(default)]
+    pub card_effect: Option<CardEffect>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardEffect {
+    #[serde(default)]
+    pub card_effect_elements: Vec<CardEffectElement>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardEffectElement {
+    pub id_gd: u32,
     #[serde(rename = "type")]
-    element_type: Option<String>,
+    pub element_type: Option<String>,
     #[serde(default)]
-    text: Option<String>,
+    pub text: Option<String>,
     #[serde(default)]
-    translations: Option<BTreeMap<String, LocaleText>>,
+    pub translations: Option<BTreeMap<String, LocaleText>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,9 +82,55 @@ pub struct IdGdOccurrence {
     pub translations: BTreeMap<String, LocaleText>,
 }
 
-fn read_card(path: &Path) -> Result<CardJson> {
+/// Per-card read/parse timings in nanoseconds (zero when not measured).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CardLoadTimings {
+    pub read_ns: u64,
+    pub parse_ns: u64,
+}
+
+/// Read and parse one card JSON file (once per build pass per card).
+pub fn load_card(path: &Path, profile: Option<&mut BuildProfile>) -> Result<CardJson> {
+    Ok(load_card_timed(path, profile, false)?.0)
+}
+
+/// Like [`load_card`], but returns per-card read/parse timings when `measure` is true.
+pub fn load_card_timed(
+    path: &Path,
+    mut profile: Option<&mut BuildProfile>,
+    measure: bool,
+) -> Result<(CardJson, CardLoadTimings)> {
+    if !measure && profile.is_none() {
+        let text =
+            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let card = serde_json::from_str(&text)
+            .with_context(|| format!("parse JSON {}", path.display()))?;
+        return Ok((card, CardLoadTimings::default()));
+    }
+
+    let t0 = Instant::now();
     let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    serde_json::from_str(&text).with_context(|| format!("parse JSON {}", path.display()))
+    let read_ns = t0.elapsed().as_nanos() as u64;
+    if let Some(p) = profile.as_mut() {
+        p.read_ns += read_ns;
+        p.bytes_read += text.len() as u64;
+    }
+
+    let t1 = Instant::now();
+    let card: CardJson = serde_json::from_str(&text)
+        .with_context(|| format!("parse JSON {}", path.display()))?;
+    let parse_ns = t1.elapsed().as_nanos() as u64;
+    if let Some(p) = profile.as_mut() {
+        p.parse_ns += parse_ns;
+    }
+
+    Ok((
+        card,
+        CardLoadTimings {
+            read_ns: if measure { read_ns } else { 0 },
+            parse_ns: if measure { parse_ns } else { 0 },
+        },
+    ))
 }
 
 fn translations_from_element(element: &CardEffectElement) -> BTreeMap<String, LocaleText> {
@@ -82,8 +151,7 @@ fn translations_from_element(element: &CardEffectElement) -> BTreeMap<String, Lo
 }
 
 /// Unique `idGd` occurrences on one card, with effect text metadata.
-pub fn parse_card_effects(path: &Path) -> Result<Vec<IdGdOccurrence>> {
-    let card = read_card(path)?;
+pub fn effects_from_card(card: &CardJson) -> Vec<IdGdOccurrence> {
     let mut seen = HashSet::new();
     let mut occurrences = Vec::new();
 
@@ -105,7 +173,12 @@ pub fn parse_card_effects(path: &Path) -> Result<Vec<IdGdOccurrence>> {
             }
         }
     }
-    Ok(occurrences)
+    occurrences
+}
+
+/// Unique `idGd` occurrences on one card (deduped per card).
+pub fn parse_card_effects(path: &Path) -> Result<Vec<IdGdOccurrence>> {
+    Ok(effects_from_card(&load_card(path, None)?))
 }
 
 /// Unique `idGd` values on one card (deduped per card).

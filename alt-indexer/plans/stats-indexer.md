@@ -41,7 +41,7 @@ Bitmap file naming: two-digit value, e.g. `stats/main_cost/07.roar` = cards with
 
 Single pass with the existing crawl (no extra JSON read):
 
-1. After `extract_compact_fields`, call `StatIndexBuilder::insert(card_index, &compact)`.
+1. After `compact_fields_from_card`, call `StatIndexBuilder::insert(card_index, &compact)`.
 2. At end of build (with `id_gd` write), call `stat_index.write_dir(&set_out.join("stats"))`.
 3. Write `stats_summary.json` from bucket cardinalities.
 
@@ -56,14 +56,14 @@ Single pass with the existing crawl (no extra JSON read):
     {
       "field": "main_cost",
       "element_reference": "MAIN_COST",
-      "counts": [0, 0, 42, 100, …],
+      "counts": { "2": 42, "3": 100 },
       "bitmap_dir": "stats/main_cost"
     }
   ]
 }
 ```
 
-- `counts[i]` = number of cards with stat value `i` (length 16).
+- `counts` maps stat value → card count; only non-zero values are included (JSON object keys are strings, e.g. `"7": 523`).
 - `bitmap_dir` is relative to the set output directory.
 
 ## Queries (future CLI)
@@ -76,6 +76,21 @@ Single pass with the existing crawl (no extra JSON read):
 | AND idGd  | `bitmap_id_gd & bitmap_stat` |
 
 `cards.bin` remains the row store for listing columns; stat bitmaps are the column index.
+
+## Faction indexer
+
+Six Roaring bitmaps, one per `mainFaction.reference` (`AX`, `BR`, `LY`, `MU`, `OR`, `YZ`). **Source is JSON only** — path faction is not used. Cards with missing or unknown `mainFaction` are counted in `factions_summary.json` as `unknown_count` and appear in no bitmap.
+
+```text
+<out>/<SET>/
+  factions_summary.json
+  factions/
+    AX.roar
+    BR.roar
+    …
+```
+
+`factions_summary.json` lists each faction’s `card_count` and `bitmap_file` path. Same `card_index` as stats and idGd indexes.
 
 ## Related
 

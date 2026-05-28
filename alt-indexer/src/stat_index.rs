@@ -142,11 +142,14 @@ impl StatIndex {
         }
     }
 
-    fn counts_for(&self, field: StatField) -> [u64; VALUE_BUCKETS] {
-        let mut counts = [0u64; VALUE_BUCKETS];
+    fn counts_for(&self, field: StatField) -> BTreeMap<u8, u64> {
+        let mut counts = BTreeMap::new();
         if let Some(buckets) = self.buckets.get(&field) {
             for (value, bitmap) in buckets.iter().enumerate() {
-                counts[value] = bitmap.len();
+                let n = bitmap.len();
+                if n > 0 {
+                    counts.insert(value as u8, n);
+                }
             }
         }
         counts
@@ -171,7 +174,7 @@ pub struct StatsSummary {
 pub struct StatFieldSummary {
     pub field: String,
     pub element_reference: String,
-    pub counts: [u64; VALUE_BUCKETS],
+    pub counts: BTreeMap<u8, u64>,
     pub bitmap_dir: String,
 }
 

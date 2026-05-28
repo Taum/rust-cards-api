@@ -36,7 +36,10 @@ fn build_query_decode_tmp_fixtures() {
         &root,
         "COREKS",
         out.path(),
-        build::BuildOptions { file_limit: None },
+        build::BuildOptions {
+            file_limit: None,
+            profile: false,
+        },
     )
     .expect("build");
     assert_eq!(summary.files_processed, 3);
@@ -83,10 +86,11 @@ fn build_query_decode_tmp_fixtures() {
         .iter()
         .find(|f| f["field"].as_str() == Some("main_cost"))
         .expect("main_cost field");
-    let counts = main_cost["counts"].as_array().expect("counts");
-    assert_eq!(counts[2].as_u64(), Some(1)); // AX_06 U_5
-    assert_eq!(counts[3].as_u64(), Some(1)); // OR_16 U_6
-    assert_eq!(counts[7].as_u64(), Some(1)); // MU_22 U_3140
+    let counts = main_cost["counts"].as_object().expect("counts object");
+    assert_eq!(counts["2"].as_u64(), Some(1)); // AX_06 U_5
+    assert_eq!(counts["3"].as_u64(), Some(1)); // OR_16 U_6
+    assert_eq!(counts["7"].as_u64(), Some(1)); // MU_22 U_3140
+    assert!(!counts.contains_key("0"));
 
     assert!(
         summary
@@ -100,4 +104,67 @@ fn build_query_decode_tmp_fixtures() {
             .join("stats/main_cost/07.roar")
             .is_file()
     );
+
+    let factions_summary_path = summary.output_dir.join("factions_summary.json");
+    assert!(factions_summary_path.is_file(), "factions_summary.json missing");
+    let factions_text = fs::read_to_string(&factions_summary_path).expect("factions summary");
+    let factions: serde_json::Value =
+        serde_json::from_str(&factions_text).expect("parse factions summary");
+    assert_eq!(factions["source"].as_str(), Some("mainFaction.reference"));
+    assert_eq!(factions["unknown_count"].as_u64(), Some(0));
+
+    let faction_entries = factions["factions"].as_array().expect("factions");
+    let yz = faction_entries
+        .iter()
+        .find(|f| f["reference"].as_str() == Some("YZ"))
+        .expect("YZ faction");
+    assert_eq!(yz["card_count"].as_u64(), Some(1));
+    let or = faction_entries
+        .iter()
+        .find(|f| f["reference"].as_str() == Some("OR"))
+        .expect("OR faction entry");
+    assert_eq!(or["card_count"].as_u64(), Some(0));
+
+    assert!(
+        summary
+            .output_dir
+            .join("factions/YZ.roar")
+            .is_file(),
+        "OR path card must index as YZ from mainFaction"
+    );
+    assert!(
+        !summary.output_dir.join("factions/OR.roar").exists(),
+        "path OR must not drive faction index"
+    );
+}
+
+#[test]
+fn build_profile_flag_prints_report() {
+    let (_guard, root) = setup_fixture_dataset();
+    let out = tempfile::tempdir().expect("out tempdir");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_alt-indexer"))
+        .args([
+            "build",
+            "--root",
+            root.to_str().expect("root"),
+            "--set",
+            "COREKS",
+            "--out",
+            out.path().to_str().expect("out"),
+            "--profile",
+        ])
+        .output()
+        .expect("run build --profile");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("build profile (3 cards):"));
+    assert!(stdout.contains("read"));
+    assert!(stdout.contains("parse"));
+    assert!(stdout.contains("process"));
+    assert!(stdout.contains("write"));
 }
