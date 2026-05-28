@@ -1,0 +1,26 @@
+[package]
+name = "uniques-http-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alt-indexer = { path = "../alt-indexer" }
+anyhow = "1"
+axum = "0.8.4"
+roaring = "0.10"
+serde_json = "1.0.143"
+tokio = { version = "1", features = ["full"] }
+dotenvy = "0.15"
+serde = { version = "1.0.219", features = ["derive"] }
+chrono = { version = "0.4.41", features = ["serde"] }
+uuid = { version = "1.17.0", features = ["serde", "v4"] }
+async-trait = "0.1"
+
+[dev-dependencies]
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+serde_json = "1.0.143"
+uuid = { version = "1.17.0", features = ["v4"] }

@@ -12,3 +12,5 @@ alt-indexer/out_index
 alt-indexer/full_index
 alt-indexer/test_index
 alt-indexer/tmp-scripts
+
+uniques-http-api/.env.local

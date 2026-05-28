@@ -1,0 +1,16 @@
+{
+  "set": "TEST",
+  "faction_order": ["AX", "BR", "LY", "MU", "OR", "YZ"],
+  "families": [
+    {
+      "start_bit": 0,
+      "faction": "AX",
+      "family_number": "04",
+      "family_id": "AX_04",
+      "max_unique_id": 1,
+      "card_count": 1,
+      "first_reference": "ALT_TEST_B_AX_04_U_1"
+    }
+  ],
+  "total_bit_span": 1
+}
