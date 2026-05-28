@@ -1,6 +1,6 @@
 ---
 name: 07-per-ability-bitmaps
-overview: Extend build/merge to emit per-effect-line Roaring bitmaps and nested `idgd_catalog.json` metadata; query and bench-query use per-line sub-indexes by default (`--whole-card` restores combined `{id}.roar` behavior).
+overview: Per-effect-line Roaring bitmaps, nested `idgd_catalog.json` metadata (including `is_echo`), and query/bench-query that default to same-line matching via per-line sub-indexes (`--whole-card` for legacy combined `{id}.roar`).
 todos:
   - id: explore-current-build
     content: Locate and understand current whole-card id_gd bitmap build + idgd_catalog writer paths.
@@ -19,6 +19,9 @@ todos:
     status: completed
   - id: add-tests
     content: Add minimal tests ensuring per-line bitmaps and catalog nesting are emitted correctly and empty ones are omitted.
+    status: completed
+  - id: is-echo-catalog-field
+    content: Add `is_echo` (true/false/null) to idgd_catalog entries; log build error when idGd appears in both MAIN and ECHO.
     status: completed
 isProject: false
 ---
@@ -49,6 +52,7 @@ Proposed JSON shape per entry (example):
   "bitmap_bytes": 1234,
   "bitmap_file": "1.roar",
   "element_type": "TRIGGER",
+  "is_echo": false,
   "translations": { "en_US": {"locale":"en_US","text":"..."} },
   "m1": { "card_count": 30, "bitmap_bytes": 900, "bitmap_file": "1_m1.roar" },
   "m2": { "card_count": 12, "bitmap_bytes": 400, "bitmap_file": "1_m2.roar" },
@@ -57,10 +61,20 @@ Proposed JSON shape per entry (example):
 }
 ```
 
-Where each nested object is the same “bitmap metadata triple”:
+Top-level fields (in addition to existing):
+
+- **`is_echo`** (`boolean` or `null`):
+  - `false` — idGd appears only under **MAIN_EFFECT** effect lines (`m1`..`m3`).
+  - `true` — idGd appears only under **ECHO_EFFECT** (`ec`).
+  - `null` — idGd appears in **both** regions; build logs  
+    `error: idGd {id} appears in both MAIN_EFFECT and ECHO_EFFECT`.
+
+Nested per-line objects (`m1`, `m2`, `m3`, `ec`) use the same metadata triple:
 - `card_count`
 - `bitmap_bytes`
 - `bitmap_file`
+
+Omit nested keys when the corresponding per-line bitmap was not written (empty).
 
 ## Implementation plan
 ### 1) Add an “id_gd + effectLine” bitmap store
@@ -77,14 +91,10 @@ Where each nested object is the same “bitmap metadata triple”:
 - In [`alt-indexer/src/build.rs`](alt-indexer/src/build.rs), extend the build loop to keep both:
   - existing `BitmapStore` (whole-card)
   - new per-line store
-- In `apply_card_index()` (already computing `compact_fields_from_card()`), also:
-  - For each main group `g=0..2`:
-    - take `[t,c,o] = compact.main_effect[g]`
-    - for each nonzero `id` among `t,c,o`: insert into line `m{g+1}`
-  - For echo line:
-    - take `[t,c,o] = compact.echo_effect`
-    - for each nonzero `id`: insert into line `ec`
-- Continue to record `IdGdCatalogBuilder.record_first(occ)` based on whole-card `effects_from_card()` as today (this preserves `element_type` + `translations`).
+- In `apply_card_index()`, walk [`id_gds_per_effect_line()`](alt-indexer/src/card.rs) (all `cardEffectElements` on each `MAIN_EFFECT` / `ECHO_EFFECT` display):
+  - insert each `(line, id_gd)` into `PerLineBitmapStore`
+  - call `IdGdCatalogBuilder.record_effect_line(id_gd, line)` to track main vs echo
+- Continue to record `IdGdCatalogBuilder.record_first(occ)` from whole-card `effects_from_card()` (preserves `element_type` + `translations`).
 
 ### 3) Write new bitmaps and extend `idgd_catalog.json`
 - In `write_index_outputs()` in [`alt-indexer/src/build.rs`](alt-indexer/src/build.rs):
@@ -98,7 +108,13 @@ Where each nested object is the same “bitmap metadata triple”:
     - the per-line store (or at least a way to look up `(id_gd, line)` bitmap cardinality and bytes)
   - For each `id_gd` present in the whole-card store:
     - set the top-level fields exactly as today
+    - set `is_echo` from `seen_main` / `seen_echo` flags (`is_echo_from_flags`)
     - attach each nested `m1/m2/m3/ec` only if that bitmap exists/non-empty (and therefore was written).
+
+### 3b) `is_echo` on catalog entries (implemented)
+- During build, `record_effect_line` sets `seen_main` for `m1`..`m3` and `seen_echo` for `ec`.
+- At catalog finalize, `is_echo_from_flags` maps to `false` / `true` / `null` (with stderr error on conflict).
+- Merge combines `is_echo` across source catalogs via `merge_is_echo_values` (conflicts → `null` + error log).
 
 ### 4) Query / bench-query: per-line sub-indexes by default (`--whole-card` opt-in)
 
@@ -140,14 +156,14 @@ Example: `--id-gd 24,191` (trigger 24, condition 191) matches only cards where *
 - Preloads either all `{id}_m*.roar` / `{id}_ec.roar` (default) or `{id}.roar` (`--whole-card`).
 - Multi-id mode samples random catalog ids and runs the same bucket/line algorithm as `query` (not the old pool ∩ across unrelated per-line files).
 
-**Schema compatibility**: `IdGdCatalogEntry` gains optional nested `m1`/`m2`/`m3`/`ec`; deserializers ignore unknown fields. Top-level `id_gd`, `element_type`, and `translations` remain the source of truth for bucketing.
+**Schema compatibility**: `IdGdCatalogEntry` includes `is_echo` and optional nested `m1`/`m2`/`m3`/`ec`. Top-level `id_gd`, `element_type`, and `translations` remain the source of truth for query bucketing. Rebuild indexes after upgrading `alt-indexer` so per-line `.roar` files and `is_echo` are present.
 
 ### 5) Update `merge` step (follow-up inside same change so builds don’t regress)
 Even though you said “update build step first”, the repo will stay consistent if `merge` also propagates these files and writes them into the merged `ALL_SETS/id_gd/` folder.
 - In [`alt-indexer/src/merge.rs`](alt-indexer/src/merge.rs):
   - Extend `merge_id_gd()` to also merge per-line bitmaps for each `(id_gd, line)` by applying the same `Mapping` remap logic used for `{id}.roar`.
   - Write merged `{id_gd}_{line}.roar` files only when non-empty.
-  - Extend `write_idgd_catalog()` to populate nested `m1/m2/m3/ec` entries with correct `card_count/bytes/file`.
+  - Extend `write_idgd_catalog()` to populate nested `m1/m2/m3/ec` and merged `is_echo`.
 
 ### 6) Tests / validation additions
 - Add a focused unit/integration test (likely in `alt-indexer/tests/build_tmp.rs`) that builds a tiny fixture index with known `MAIN_EFFECT` groups and verifies:
@@ -171,3 +187,4 @@ Even though you said “update build step first”, the repo will stay consisten
   - Whole: `{id_gd}.roar`
   - Per-line: `{id_gd}_m1.roar`, `{id_gd}_m2.roar`, `{id_gd}_m3.roar`, `{id_gd}_ec.roar`
 - **Catalog nested field names**: `m1`, `m2`, `m3`, `ec` (matching the file suffixes).
+- **Catalog `is_echo`**: `false` = main only, `true` = echo only, `null` = both (error at build).

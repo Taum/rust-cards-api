@@ -270,6 +270,10 @@ fn build_multi_idgd_query(
     let id_gd_dir = set_dir.join("id_gd");
     let bitmap = execute_idgd_query(&id_gd_dir, &buckets, whole_card)?;
 
+    if !whole_card && bitmap.is_empty() {
+        warn_if_missing_per_line_bitmaps(&id_gd_dir, &buckets);
+    }
+
     let recap_lines = build_recap_lines(locale, &buckets, &text_by_id);
 
     Ok((bitmap, recap_lines, text_by_id))
@@ -558,6 +562,36 @@ fn try_load_bitmap(path: &Path) -> Result<Option<RoaringBitmap>> {
     Ok(Some(bmp))
 }
 
+/// If no `{id}_m*.roar` / `{id}_ec.roar` exist for the queried ids, the index likely predates
+/// per-line bitmaps or needs a rebuild.
+fn warn_if_missing_per_line_bitmaps(id_gd_dir: &Path, buckets: &IdGdQueryBuckets) {
+    let ids: Vec<u32> = buckets
+        .triggers
+        .iter()
+        .chain(buckets.conditions.iter())
+        .chain(buckets.outputs.iter())
+        .copied()
+        .collect();
+
+    let any_file = ids.iter().any(|&id| {
+        EffectLine::ALL.iter().any(|line| {
+            id_gd_dir
+                .join(format!("{id}_{}.roar", line.suffix()))
+                .is_file()
+        })
+    });
+
+    if !any_file {
+        eprintln!(
+            "warning: no per-line idGd bitmaps found under {} for the queried ids.",
+            id_gd_dir.display()
+        );
+        eprintln!(
+            "         Rebuild the index (alt-indexer build) or pass --whole-card to use combined {{id}}.roar files."
+        );
+    }
+}
+
 fn pick_translation(map: &BTreeMap<String, crate::card::LocaleText>, locale: &str) -> String {
     if let Some(t) = map.get(locale) {
         return t.text.clone();
@@ -637,6 +671,7 @@ mod tests {
                 m2: None,
                 m3: None,
                 ec: None,
+                is_echo: Some(false),
             });
         }
         let cat = IdGdCatalog {

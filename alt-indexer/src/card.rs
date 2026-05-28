@@ -1,3 +1,4 @@
+use crate::bitmap::EffectLine;
 use crate::profile::BuildProfile;
 use anyhow::Context;
 use anyhow::Result;
@@ -150,6 +151,52 @@ fn translations_from_element(element: &CardEffectElement) -> BTreeMap<String, Lo
     map
 }
 
+/// All `idGd` values on one card, grouped by effect line (`m1`..`m3`, `ec`).
+///
+/// Walks `MAIN_EFFECT` / `ECHO_EFFECT` elements and their `cardEffectDisplays` the same way
+/// effect lines are defined in card JSON (not the compact T/C/O slot projection).
+pub fn id_gds_per_effect_line(card: &CardJson) -> Vec<(EffectLine, u32)> {
+    let mut out = Vec::new();
+
+    for element in &card.card_elements {
+        let elem_type = element
+            .card_element_type
+            .as_ref()
+            .and_then(|t| t.reference.as_deref());
+
+        match elem_type {
+            Some("MAIN_EFFECT") => {
+                for (group_idx, display) in element.card_effect_displays.iter().take(3).enumerate()
+                {
+                    let line = match group_idx {
+                        0 => EffectLine::M1,
+                        1 => EffectLine::M2,
+                        2 => EffectLine::M3,
+                        _ => continue,
+                    };
+                    if let Some(effect) = &display.card_effect {
+                        for node in &effect.card_effect_elements {
+                            out.push((line, node.id_gd));
+                        }
+                    }
+                }
+            }
+            Some("ECHO_EFFECT") => {
+                for display in &element.card_effect_displays {
+                    if let Some(effect) = &display.card_effect {
+                        for node in &effect.card_effect_elements {
+                            out.push((EffectLine::Ec, node.id_gd));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    out
+}
+
 /// Unique `idGd` occurrences on one card, with effect text metadata.
 pub fn effects_from_card(card: &CardJson) -> Vec<IdGdOccurrence> {
     let mut seen = HashSet::new();
@@ -179,6 +226,33 @@ pub fn effects_from_card(card: &CardJson) -> Vec<IdGdOccurrence> {
 /// Unique `idGd` occurrences on one card (deduped per card).
 pub fn parse_card_effects(path: &Path) -> Result<Vec<IdGdOccurrence>> {
     Ok(effects_from_card(&load_card(path, None)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bitmap::EffectLine;
+
+    #[test]
+    fn id_gds_per_effect_line_reads_all_nodes_on_each_display() {
+        let json = r#"{
+            "cardElements": [{
+                "cardElementType": { "reference": "MAIN_EFFECT" },
+                "cardEffectDisplays": [{
+                    "cardEffect": {
+                        "cardEffectElements": [
+                            { "idGd": 24, "type": "TRIGGER" },
+                            { "idGd": 191, "type": "CONDITION" }
+                        ]
+                    }
+                }]
+            }]
+        }"#;
+        let card: CardJson = serde_json::from_str(json).unwrap();
+        let pairs = id_gds_per_effect_line(&card);
+        assert!(pairs.contains(&(EffectLine::M1, 24)));
+        assert!(pairs.contains(&(EffectLine::M1, 191)));
+    }
 }
 
 /// Unique `idGd` values on one card (deduped per card).

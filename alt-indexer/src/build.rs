@@ -1,5 +1,5 @@
-use crate::bitmap::{BitmapStore, EffectLine, PerLineBitmapStore};
-use crate::card::{effects_from_card, CardJson};
+use crate::bitmap::{BitmapStore, PerLineBitmapStore};
+use crate::card::{effects_from_card, id_gds_per_effect_line, CardJson};
 use crate::catalog::{Catalog, CatalogBuilder};
 use crate::compact::{compact_fields_from_card, write_compact_records, CompactCardFields};
 use crate::crawl::{discover_card_files, CardFile, DiscoverOptions};
@@ -244,24 +244,9 @@ fn apply_card_index(
     }
     let compact = compact_fields_from_card(card);
 
-    // Per-effect-line bitmaps (3 MAIN_EFFECT lines + 1 ECHO line).
-    for (g, ids) in compact.main_effect.iter().enumerate() {
-        let line = match g {
-            0 => EffectLine::M1,
-            1 => EffectLine::M2,
-            2 => EffectLine::M3,
-            _ => continue,
-        };
-        for &id in ids {
-            if id != 0 {
-                per_line_bitmaps.insert(id as u32, line, card_index);
-            }
-        }
-    }
-    for &id in &compact.echo_effect {
-        if id != 0 {
-            per_line_bitmaps.insert(id as u32, EffectLine::Ec, card_index);
-        }
+    for (line, id_gd) in id_gds_per_effect_line(card) {
+        per_line_bitmaps.insert(id_gd, line, card_index);
+        idgd_catalog_builder.record_effect_line(id_gd, line);
     }
 
     stat_index.insert(card_index, &compact);

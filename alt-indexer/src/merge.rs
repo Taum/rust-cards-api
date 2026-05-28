@@ -1,7 +1,9 @@
 use crate::catalog::{Catalog, FamilyEntry, FACTION_ORDER};
 use crate::compact::RECORD_SIZE;
 use crate::bitmap::EffectLine;
-use crate::idgd_catalog::{BitmapMeta, IdGdCatalog, IdGdCatalogEntry};
+use crate::idgd_catalog::{
+    merge_is_echo_values, BitmapMeta, IdGdCatalog, IdGdCatalogBuilder, IdGdCatalogEntry,
+};
 use anyhow::{anyhow, Context, Result};
 use roaring::RoaringBitmap;
 use serde::{Deserialize, Serialize};
@@ -452,7 +454,11 @@ fn merge_id_gd(
     out: &Path,
     plan: &MergePlan,
     sources: &[SourceIndex],
-) -> Result<(usize, BTreeMap<u32, u64>, BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>)>)> {
+) -> Result<(
+    usize,
+    BTreeMap<u32, u64>,
+    BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>, Option<bool>)>,
+)> {
     let out_dir = out.join("id_gd");
     fs::create_dir_all(&out_dir)?;
 
@@ -460,7 +466,9 @@ fn merge_id_gd(
 
     // Gather all idGd values + metadata candidates in set order.
     let mut all_ids: BTreeSet<u32> = BTreeSet::new();
-    let mut meta: BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>)> = BTreeMap::new();
+    let mut meta: BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>, Option<bool>)> =
+        BTreeMap::new();
+    let mut is_echo_by_id: BTreeMap<u32, Vec<Option<bool>>> = BTreeMap::new();
     for set in &plan.source_order {
         let src = *src_by_set.get(set.as_str()).expect("src exists");
         let cat_path = src.dir.join("idgd_catalog.json");
@@ -468,8 +476,19 @@ fn merge_id_gd(
         let cat: IdGdCatalog = serde_json::from_str(&cat_text).with_context(|| format!("parse {}", cat_path.display()))?;
         for e in cat.entries {
             all_ids.insert(e.id_gd);
-            meta.entry(e.id_gd)
-                .or_insert_with(|| (e.element_type, e.translations));
+            is_echo_by_id.entry(e.id_gd).or_default().push(e.is_echo);
+            meta.entry(e.id_gd).or_insert_with(|| {
+                (
+                    e.element_type,
+                    e.translations,
+                    e.is_echo,
+                )
+            });
+        }
+    }
+    for (&id_gd, values) in &is_echo_by_id {
+        if let Some(entry) = meta.get_mut(&id_gd) {
+            entry.2 = merge_is_echo_values(values, id_gd);
         }
     }
 
@@ -749,14 +768,14 @@ fn write_idgd_catalog(
     out: &Path,
     merged_set_name: &str,
     bitmap_sizes: &BTreeMap<u32, u64>,
-    meta: &BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>)>,
+    meta: &BTreeMap<u32, (String, BTreeMap<String, crate::card::LocaleText>, Option<bool>)>,
 ) -> Result<()> {
     let mut entries: Vec<IdGdCatalogEntry> = Vec::with_capacity(bitmap_sizes.len());
     for (&id_gd, &bitmap_bytes) in bitmap_sizes {
-        let (element_type, translations) = meta
+        let (element_type, translations, is_echo) = meta
             .get(&id_gd)
             .cloned()
-            .unwrap_or_else(|| ("UNKNOWN".to_string(), BTreeMap::new()));
+            .unwrap_or_else(|| ("UNKNOWN".to_string(), BTreeMap::new(), None));
         // card_count is computed by loading bitmap we just wrote and counting.
         let bmp_path = out.join("id_gd").join(format!("{id_gd}.roar"));
         let bmp = load_bitmap(&bmp_path)?;
@@ -792,22 +811,15 @@ fn write_idgd_catalog(
             m2: line_meta(EffectLine::M2)?,
             m3: line_meta(EffectLine::M3)?,
             ec: line_meta(EffectLine::Ec)?,
+            is_echo,
         });
     }
     let cat = IdGdCatalog {
         set: merged_set_name.to_string(),
         entries,
     };
-    IdGdCatalog::save(&cat, &out.join("idgd_catalog.json"))?;
+    IdGdCatalogBuilder::save(&cat, &out.join("idgd_catalog.json"))?;
     Ok(())
-}
-
-impl IdGdCatalog {
-    fn save(catalog: &IdGdCatalog, path: &Path) -> Result<()> {
-        let text = serde_json::to_string_pretty(catalog)?;
-        fs::write(path, text)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Serialize)]
