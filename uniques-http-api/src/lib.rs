@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{Json, Router, routing::get};
 use serde::Serialize;
 
+mod cards;
 mod env;
 
 pub mod loader;
@@ -25,5 +26,8 @@ pub async fn health() -> Json<HelloResponse> {
 }
 
 pub fn app(state: Arc<AppState>) -> Router {
-    Router::new().route("/health", get(health)).with_state(state)
+    Router::new()
+        .route("/health", get(health))
+        .route("/api/v2/cards", get(cards::get_cards_v2))
+        .with_state(state)
 }

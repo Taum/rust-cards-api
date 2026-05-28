@@ -1,6 +1,6 @@
 # AI Query Analysis
 
-## `GET /api/cards` Parameters
+## `GET /api/v2/cards` Parameters
 
 ### Core filters
 
@@ -39,7 +39,7 @@
 If multiple values are specified for a trigger, condition or output, a predicate is created that matches ANY of these values (OR).
 If multiple effects are specified, the `effectMode` determines if the card must match at least one of them (`or`) or all of them (`and`).
 
-## `GET /api/cards` Response
+## `GET /api/v2/cards` Response
 
 The response is a JSON files which includes the total number of matches, a page of results and the cursor for getting the next page of results.
 
