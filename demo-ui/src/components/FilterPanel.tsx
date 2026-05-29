@@ -230,6 +230,23 @@ export function FilterPanel({
           />
         </label>
       </section>
+
+      <section className="border-t border-slate-800 pt-4">
+        <h3 className="mb-2 text-sm font-medium text-slate-300">Debug</h3>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={filters.debugBgaTrigram}
+            onChange={(e) => setFilters({ debugBgaTrigram: e.target.checked })}
+            className="rounded border-slate-600 bg-slate-950 text-sky-500 focus:ring-sky-500"
+          />
+          BGA trigrams
+        </label>
+        <p className="mt-1 text-xs text-slate-500">
+          Adds <code className="font-mono text-slate-400">debug_bga_trigram</code> to
+          the API request and shows TCO triplets under each card.
+        </p>
+      </section>
     </aside>
   );
 }

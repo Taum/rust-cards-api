@@ -117,6 +117,10 @@ export function buildQuery(
   );
   params.set('limit', String(limit));
 
+  if (state.debugBgaTrigram) {
+    params.set('debug_bga_trigram', '');
+  }
+
   if (options?.cursor !== undefined) {
     params.set('cursor', String(options.cursor));
   }

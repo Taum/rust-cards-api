@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ensureAlteredRenderInit } from '../api/alteredRender';
 import { cardToAlteredApiJson } from '../api/cardToAlteredApiJson';
@@ -8,10 +8,30 @@ import type { CardV2 } from '../types';
 type AlteredCardSlotProps = {
   card: CardV2;
   locale: CardLocale;
+  showDebugTrigram: boolean;
 };
 
-export function AlteredCardSlot({ card, locale }: AlteredCardSlotProps) {
+export function AlteredCardSlot({
+  card,
+  locale,
+  showDebugTrigram,
+}: AlteredCardSlotProps) {
   const slotRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+  const trigramText = card.debug_bga_trigram ?? '';
+
+  const copyTrigram = async () => {
+    if (!trigramText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(trigramText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -49,10 +69,33 @@ export function AlteredCardSlot({ card, locale }: AlteredCardSlotProps) {
   }, [card, locale]);
 
   return (
-    <div
-      ref={slotRef}
-      className="aspect-[744/1039] w-full overflow-hidden rounded-lg"
-      data-card-ref={card.reference}
-    />
+    <div className="flex flex-col gap-1.5">
+      <div
+        ref={slotRef}
+        className="aspect-[744/1039] w-full overflow-hidden rounded-lg"
+        data-card-ref={card.reference}
+      />
+      {showDebugTrigram && (
+        <div className="flex items-start gap-1">
+          <p className="min-w-0 flex-1 break-all font-mono text-[10px] leading-snug text-slate-400">
+            {trigramText}
+          </p>
+          <button
+            type="button"
+            onClick={() => void copyTrigram()}
+            disabled={!trigramText}
+            title={copied ? 'Copied' : 'Copy trigram'}
+            aria-label={copied ? 'Copied' : 'Copy trigram'}
+            className={`shrink-0 rounded border px-1 py-0.5 font-mono text-[10px] leading-none disabled:opacity-40 ${
+              copied
+                ? 'border-emerald-500 bg-emerald-950/60 text-emerald-400'
+                : 'border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+            }`}
+          >
+            C
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

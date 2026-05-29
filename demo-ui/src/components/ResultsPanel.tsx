@@ -8,9 +8,10 @@ import { LoadingSpinner } from './LoadingSpinner';
 type ResultsPanelProps = {
   query: CardsQueryState;
   locale: CardLocale;
+  showDebugTrigram: boolean;
 };
 
-export function ResultsPanel({ query, locale }: ResultsPanelProps) {
+export function ResultsPanel({ query, locale, showDebugTrigram }: ResultsPanelProps) {
   const {
     status,
     cards,
@@ -97,7 +98,11 @@ export function ResultsPanel({ query, locale }: ResultsPanelProps) {
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2"
         >
-          <CardList cards={cards} locale={locale} />
+          <CardList
+            cards={cards}
+            locale={locale}
+            showDebugTrigram={showDebugTrigram}
+          />
           {hasMore && <div ref={sentinelRef} className="h-1" aria-hidden />}
         </div>
       )}

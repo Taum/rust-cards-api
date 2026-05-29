@@ -84,7 +84,11 @@ export default function App() {
 
         <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <QueryPreview queryString={query.queryString} url={query.url} />
-          <ResultsPanel query={query} locale={locale} />
+          <ResultsPanel
+            query={query}
+            locale={locale}
+            showDebugTrigram={filters.debugBgaTrigram}
+          />
         </div>
       </main>
     </div>

@@ -70,6 +70,8 @@ pub struct CardV2 {
     pub faction: CardFaction,
     pub main_effect: BTreeMap<String, String>,
     pub echo_effect: BTreeMap<String, String>,
+    #[serde(rename = "debug_bga_trigram", skip_serializing_if = "Option::is_none")]
+    pub debug_bga_trigram: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -155,6 +157,7 @@ struct CardsRequest {
     factions: Vec<Faction>,
     main_cost: Option<CostPredicate>,
     recall_cost: Option<CostPredicate>,
+    debug_bga_trigram: bool,
 }
 
 pub async fn get_cards_v2(
@@ -165,7 +168,8 @@ pub async fn get_cards_v2(
     let req = parse_request(&state, &params)?;
     let bitmap = build_bitmap(&state, &req)?;
     let total = bitmap.len() as u64;
-    let (cards, next_cursor) = page_cards_v2(&state, &bitmap, req.cursor, req.limit)?;
+    let (cards, next_cursor) =
+        page_cards_v2(&state, &bitmap, req.cursor, req.limit, req.debug_bga_trigram)?;
 
     Ok(Json(CardsResponse {
         iter: CardsIter {
@@ -232,6 +236,7 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
     let factions = parse_factions(params)?;
     let main_cost = parse_cost_predicate(params, "mainCost")?;
     let recall_cost = parse_cost_predicate(params, "recallCost")?;
+    let debug_bga_trigram = params.contains_key("debug_bga_trigram");
 
     validate_idgd_types(state, &filters)?;
 
@@ -242,6 +247,7 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
         factions,
         main_cost,
         recall_cost,
+        debug_bga_trigram,
     })
 }
 
@@ -733,6 +739,7 @@ fn page_cards_v2(
     bitmap: &RoaringBitmap,
     cursor: Option<u32>,
     limit: usize,
+    debug_bga_trigram: bool,
 ) -> ApiResult<(Vec<CardV2>, Option<u32>)> {
     let mut out = Vec::with_capacity(limit);
     let mut last_index: Option<u32> = None;
@@ -790,6 +797,7 @@ fn page_cards_v2(
             },
             main_effect: build_main_effect_localized(&idgd_by_id, &view),
             echo_effect: build_echo_effect_localized(&idgd_by_id, &view),
+            debug_bga_trigram: debug_bga_trigram.then(|| build_debug_bga_trigram(&view)),
         });
         last_index = Some(card_index);
         if out.len() >= limit {
@@ -814,6 +822,26 @@ fn faction_from_code(code: u8) -> String {
         _ => "UN",
     }
     .to_string()
+}
+
+fn build_debug_bga_trigram(view: &alt_indexer::compact::CompactCardView<'_>) -> String {
+    let mut triplets: Vec<String> = Vec::new();
+    for g in 0..3 {
+        if let Some(triplet) = format_tco_triplet(view.main_effect_group(g)) {
+            triplets.push(triplet);
+        }
+    }
+    if let Some(triplet) = format_tco_triplet(view.echo_effect()) {
+        triplets.push(triplet);
+    }
+    triplets.join(";")
+}
+
+fn format_tco_triplet([t, c, o]: [u16; 3]) -> Option<String> {
+    if t == 0 && c == 0 && o == 0 {
+        return None;
+    }
+    Some(format!("{t}/{c}/{o}"))
 }
 
 fn build_main_effect_localized(
@@ -1081,8 +1109,8 @@ mod tests {
             mountain_power: 0,
             ocean_power: 0,
             forest_power: 0,
-            main_effect: [[0; 3]; 3],
-            echo_effect: [0; 3],
+            main_effect: [[24, 191, 90], [0, 0, 0], [0, 0, 0]],
+            echo_effect: [24, 0, 42],
         });
         for &idx in &[2u32, 5] {
             let off = idx as usize * RECORD_SIZE;
@@ -1183,7 +1211,7 @@ mod tests {
         params.insert("limit".to_string(), vec!["1".to_string()]);
         let req = parse_request(&state, &params).unwrap();
         let bmp = build_bitmap(&state, &req).unwrap();
-        let (page, _) = page_cards_v2(&state, &bmp, None, 1).unwrap();
+        let (page, _) = page_cards_v2(&state, &bmp, None, 1, false).unwrap();
         let card = &page[0];
         assert_eq!(card.name.get("en_US").map(String::as_str), Some("Test Card"));
         assert_eq!(card.artist, "Test Artist");
@@ -1202,17 +1230,17 @@ mod tests {
         let req = parse_request(&state, &params).unwrap();
         let bmp = build_bitmap(&state, &req).unwrap();
 
-        let (page1, cur1) = page_cards_v2(&state, &bmp, None, 1).unwrap();
+        let (page1, cur1) = page_cards_v2(&state, &bmp, None, 1, false).unwrap();
         assert_eq!(page1.len(), 1);
         assert_eq!(page1[0].reference, "ALT_TEST_B_AX_01_U_3"); // card_index 2 => unique_id 3
         assert_eq!(cur1, Some(2));
 
-        let (page2, cur2) = page_cards_v2(&state, &bmp, cur1, 1).unwrap();
+        let (page2, cur2) = page_cards_v2(&state, &bmp, cur1, 1, false).unwrap();
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].reference, "ALT_TEST_B_AX_01_U_6"); // card_index 5 => unique_id 6
         assert_eq!(cur2, Some(5));
 
-        let (page3, cur3) = page_cards_v2(&state, &bmp, cur2, 1).unwrap();
+        let (page3, cur3) = page_cards_v2(&state, &bmp, cur2, 1, false).unwrap();
         assert!(page3.is_empty());
         assert_eq!(cur3, None);
     }
@@ -1372,6 +1400,47 @@ mod tests {
         let bmp = build_bitmap(&state, &req).unwrap();
         assert_eq!(bmp.len(), 1);
         assert!(bmp.contains(5));
+    }
+
+    #[test]
+    fn debug_bga_trigram_param_parsing() {
+        let state = test_state();
+        let mut enabled: QueryMultiMap = HashMap::new();
+        enabled.insert("debug_bga_trigram".to_string(), vec![String::new()]);
+        let req = parse_request(&state, &enabled).unwrap();
+        assert!(req.debug_bga_trigram);
+
+        let params: QueryMultiMap = HashMap::new();
+        let req = parse_request(&state, &params).unwrap();
+        assert!(!req.debug_bga_trigram);
+    }
+
+    #[test]
+    fn debug_bga_trigram_includes_main_and_echo_tcos() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("limit".to_string(), vec!["1".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        let (page, _) = page_cards_v2(&state, &bmp, None, 1, true).unwrap();
+        assert_eq!(page[0].debug_bga_trigram.as_deref(), Some("24/191/90;24/0/42"));
+
+        let (page, _) = page_cards_v2(&state, &bmp, None, 1, false).unwrap();
+        assert!(page[0].debug_bga_trigram.is_none());
+    }
+
+    #[test]
+    fn debug_bga_trigram_serializes_on_card() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("limit".to_string(), vec!["1".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        let (page, _) = page_cards_v2(&state, &bmp, None, 1, true).unwrap();
+        let json = serde_json::to_value(&page[0]).unwrap();
+        assert_eq!(json["debug_bga_trigram"], "24/191/90;24/0/42");
     }
 }
 

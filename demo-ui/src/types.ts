@@ -30,6 +30,7 @@ export type FilterState = {
   handCost: string;
   reserveCost: string;
   limit: string;
+  debugBgaTrigram: boolean;
 };
 
 export const FACTIONS = ['AX', 'BR', 'LY', 'MU', 'OR', 'YZ'] as const;
@@ -44,6 +45,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   handCost: '',
   reserveCost: '',
   limit: '',
+  debugBgaTrigram: false,
 };
 
 export type CardsIter = {
@@ -81,6 +83,7 @@ export type CardV2 = {
   faction: CardFaction;
   mainEffect: Record<string, string>;
   echoEffect: Record<string, string>;
+  debug_bga_trigram?: string;
 };
 
 export type CardsResponse = {
