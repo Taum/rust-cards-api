@@ -9,7 +9,20 @@
       "family_id": "AX_04",
       "max_unique_id": 1,
       "card_count": 1,
-      "first_reference": "ALT_TEST_B_AX_04_U_1"
+      "first_reference": "ALT_TEST_B_AX_04_U_1",
+      "name": { "en_US": "Fixture Card" },
+      "artist": "Fixture Artist",
+      "card_sub_types": [
+        {
+          "reference": "ENGINEER",
+          "name": { "en_US": "Engineer" }
+        }
+      ],
+      "set": {
+        "reference": "COREKS",
+        "name": "Beyond the Gates - KS Edition",
+        "code": "BTG"
+      }
     }
   ],
   "total_bit_span": 1

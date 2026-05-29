@@ -52,14 +52,31 @@ The response is a JSON files which includes the total number of matches, a page 
   cards: [
     {
       reference: "ALT_COREKS_AX_05_U_161",
+      name: {
+        en_US: "Ayxas, Repented Tyrant",
+        fr_FR: "Ayxas, Tyran Repenti"
+      },
+      artist: "Artist Name",
+      set: {
+        reference: "COREKS",
+        name: "Beyond the Gates - KS Edition",
+        code: "BTG"
+      },
+      cardSubTypes: [
+        {
+          reference: "NOBLE",
+          name: { en_US: "Noble", fr_FR: "Noble" }
+        }
+      ],
       mainCost: 2,
       recallCost: 3,
       forestPower: 1,
       mountainPower: 6,
       oceanPower: 3,
       faction: {
-        code: "AX"
-      }
+        code: "AX",
+        name: "Axiom"
+      },
       mainEffect: {
         en_US: "{R} If there's a card in your Landmarks: Target Character in play or in Reserve gains 2 boosts.  When I leave the Expedition zone — []You may [Augment] target card in play or in Reserve.",
         fr_FR: "{R} S'il y a au moins une carte dans vos Repères : Un Personnage ciblé en jeu ou en Réserve gagne 2 boosts.  Lorsque je quitte la zone d'Expédition — [] Vous pouvez [AUGMENT] une carte ciblée en jeu ou en Réserve."

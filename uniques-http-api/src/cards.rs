@@ -25,12 +25,43 @@ pub struct CardsIter {
 #[derive(Debug, Serialize)]
 pub struct CardFaction {
     pub code: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSetV2 {
+    pub reference: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+impl From<&alt_indexer::catalog::FamilySet> for CardSetV2 {
+    fn from(set: &alt_indexer::catalog::FamilySet) -> Self {
+        Self {
+            reference: set.reference.clone(),
+            name: set.name.clone(),
+            code: set.code.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSubTypeV2 {
+    pub reference: String,
+    pub name: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CardV2 {
     pub reference: String,
+    pub name: BTreeMap<String, String>,
+    pub artist: String,
+    pub set: CardSetV2,
+    pub card_sub_types: Vec<CardSubTypeV2>,
     pub main_cost: u8,
     pub recall_cost: u8,
     pub forest_power: u8,
@@ -71,11 +102,31 @@ impl IdGdSelector {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum EffectCombineMode {
+    #[default]
+    And,
+    Or,
+}
+
+#[derive(Debug, Default)]
+struct EffectSlotFilter {
+    index: u32,
+    t: Vec<u32>,
+    c: Vec<u32>,
+    o: Vec<u32>,
+}
+
+impl EffectSlotFilter {
+    fn is_empty(&self) -> bool {
+        self.t.is_empty() && self.c.is_empty() && self.o.is_empty()
+    }
+}
+
 #[derive(Debug, Default)]
 struct AbilityFilters {
-    effect0_t: Vec<u32>,
-    effect0_c: Vec<u32>,
-    effect0_o: Vec<u32>,
+    effects: Vec<EffectSlotFilter>,
+    effect_mode: EffectCombineMode,
     support_t: Vec<u32>,
     support_c: Vec<u32>,
     support_o: Vec<u32>,
@@ -150,15 +201,6 @@ fn has_any(params: &QueryMultiMap, key: &str) -> bool {
 }
 
 fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsRequest> {
-    // Reject any unsupported effect predicates beyond effect[0]
-    for key in params.keys() {
-        if key.starts_with("effect[") && !key.starts_with("effect[0]") {
-            return Err(bad_request(format!(
-                "unsupported parameter '{key}': only effect[0] is supported in this iteration"
-            )));
-        }
-    }
-
     let limit = match get_first(params, "limit") {
         None => 50usize,
         Some(v) => parse_usize("limit", v)?,
@@ -181,9 +223,8 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
     }
 
     let mut filters = AbilityFilters::default();
-    filters.effect0_t = parse_id_list(params, "effect[0][t]")?;
-    filters.effect0_c = parse_id_list(params, "effect[0][c]")?;
-    filters.effect0_o = parse_id_list(params, "effect[0][o]")?;
+    filters.effects = parse_effect_slots(params)?;
+    filters.effect_mode = parse_effect_mode(params)?;
     filters.support_t = parse_id_list(params, "support[t]")?;
     filters.support_c = parse_id_list(params, "support[c]")?;
     filters.support_o = parse_id_list(params, "support[o]")?;
@@ -191,22 +232,6 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
     let factions = parse_factions(params)?;
     let main_cost = parse_cost_predicate(params, "mainCost")?;
     let recall_cost = parse_cost_predicate(params, "recallCost")?;
-
-    // Must specify at least one predicate.
-    let has_any = !filters.effect0_t.is_empty()
-        || !filters.effect0_c.is_empty()
-        || !filters.effect0_o.is_empty()
-        || !filters.support_t.is_empty()
-        || !filters.support_c.is_empty()
-        || !filters.support_o.is_empty()
-        || !factions.is_empty()
-        || main_cost.is_some()
-        || recall_cost.is_some();
-    if !has_any {
-        return Err(bad_request(
-            "must provide at least one filter predicate".to_string(),
-        ));
-    }
 
     validate_idgd_types(state, &filters)?;
 
@@ -238,6 +263,84 @@ fn parse_id_list(params: &QueryMultiMap, key: &str) -> ApiResult<Vec<u32>> {
         }
     }
     Ok(out)
+}
+
+fn parse_effect_mode(params: &QueryMultiMap) -> ApiResult<EffectCombineMode> {
+    let Some(raw) = get_first(params, "effectMode") else {
+        return Ok(EffectCombineMode::And);
+    };
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "and" => Ok(EffectCombineMode::And),
+        "or" => Ok(EffectCombineMode::Or),
+        other => Err(bad_request(format!(
+            "invalid effectMode value '{other}': expected 'and' or 'or'"
+        ))),
+    }
+}
+
+/// Parses `effect[N][t|c|o]` keys into ordered slots (sparse indices allowed).
+fn parse_effect_slots(params: &QueryMultiMap) -> ApiResult<Vec<EffectSlotFilter>> {
+    let mut by_index: BTreeMap<u32, EffectSlotFilter> = BTreeMap::new();
+
+    for key in params.keys() {
+        let Some((index, selector)) = parse_effect_param_key(key)? else {
+            continue;
+        };
+        let ids = parse_id_list(params, key)?;
+        let slot = by_index.entry(index).or_insert_with(|| EffectSlotFilter {
+            index,
+            ..EffectSlotFilter::default()
+        });
+        match selector {
+            IdGdSelector::T => slot.t = ids,
+            IdGdSelector::C => slot.c = ids,
+            IdGdSelector::O => slot.o = ids,
+        }
+    }
+
+    Ok(by_index
+        .into_values()
+        .filter(|slot| !slot.is_empty())
+        .collect())
+}
+
+/// Returns `None` for keys that are not `effect[N][t|c|o]`.
+fn parse_effect_param_key(key: &str) -> ApiResult<Option<(u32, IdGdSelector)>> {
+    const PREFIX: &str = "effect[";
+    if !key.starts_with(PREFIX) {
+        return Ok(None);
+    }
+    if key == "effectMode" {
+        return Ok(None);
+    }
+
+    let rest = &key[PREFIX.len()..];
+    let bracket_end = rest
+        .find(']')
+        .ok_or_else(|| bad_request(format!("invalid effect parameter '{key}'")))?;
+    let index_str = &rest[..bracket_end];
+    if index_str.is_empty() {
+        return Err(bad_request(format!("invalid effect parameter '{key}'")));
+    }
+    let index = parse_u32("effect slot index", index_str)?;
+
+    let field_part = &rest[bracket_end + 1..];
+    if !field_part.starts_with('[') || !field_part.ends_with(']') || field_part.len() != 3 {
+        return Err(bad_request(format!(
+            "invalid effect parameter '{key}': expected effect[N][t], effect[N][c], or effect[N][o]"
+        )));
+    }
+    let selector = match &field_part[1..2] {
+        "t" => IdGdSelector::T,
+        "c" => IdGdSelector::C,
+        "o" => IdGdSelector::O,
+        _ => {
+            return Err(bad_request(format!(
+                "invalid effect parameter '{key}': expected [t], [c], or [o]"
+            )));
+        }
+    };
+    Ok(Some((index, selector)))
 }
 
 fn parse_factions(params: &QueryMultiMap) -> ApiResult<Vec<Faction>> {
@@ -386,10 +489,30 @@ fn validate_idgd_types(state: &AppState, filters: &AbilityFilters) -> ApiResult<
         types.insert(entry.id_gd, entry.element_type.as_str());
     }
 
+    for slot in &filters.effects {
+        for (key_suffix, selector, ids) in [
+            ("[t]", IdGdSelector::T, &slot.t),
+            ("[c]", IdGdSelector::C, &slot.c),
+            ("[o]", IdGdSelector::O, &slot.o),
+        ] {
+            let key = format!("effect[{}]{key_suffix}", slot.index);
+            for &id in ids.iter() {
+                let Some(actual) = types.get(&id).copied() else {
+                    return Err(bad_request(format!(
+                        "{key} contains unknown idGd {id} (not present in idgd_catalog)"
+                    )));
+                };
+                let expected = selector.expected_type();
+                if actual != expected {
+                    return Err(bad_request(format!(
+                        "{key} contains idGd {id} of type {actual}, expected {expected}"
+                    )));
+                }
+            }
+        }
+    }
+
     for (key, selector, ids) in [
-        ("effect[0][t]", IdGdSelector::T, &filters.effect0_t),
-        ("effect[0][c]", IdGdSelector::C, &filters.effect0_c),
-        ("effect[0][o]", IdGdSelector::O, &filters.effect0_o),
         ("support[t]", IdGdSelector::T, &filters.support_t),
         ("support[c]", IdGdSelector::C, &filters.support_c),
         ("support[o]", IdGdSelector::O, &filters.support_o),
@@ -415,15 +538,17 @@ fn validate_idgd_types(state: &AppState, filters: &AbilityFilters) -> ApiResult<
 fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap> {
     let mut groups = Vec::new();
 
-    // effect[0] searches main lines only (M1/M2/M3) with per-line bucket intersection,
-    // then OR across lines. This matches alt-indexer's default per-line query behavior.
-    let effect0 = effect0_bitmap_main_lines(
-        state,
-        &req.filters.effect0_t,
-        &req.filters.effect0_c,
-        &req.filters.effect0_o,
-    );
-    if let Some(bmp) = effect0 {
+    // Each effect[N] searches main lines only (M1/M2/M3) with per-line bucket intersection,
+    // then OR across lines. Multiple slots combine per effectMode (default: and).
+    let effect_bitmaps: Vec<RoaringBitmap> = req
+        .filters
+        .effects
+        .iter()
+        .filter_map(|slot| {
+            effect0_bitmap_main_lines(state, &slot.t, &slot.c, &slot.o)
+        })
+        .collect();
+    if let Some(bmp) = combine_effect_bitmaps(&effect_bitmaps, req.filters.effect_mode) {
         groups.push(bmp);
     }
 
@@ -464,12 +589,22 @@ fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap
     let mut it = groups.into_iter();
     let mut out = match it.next() {
         Some(first) => first,
-        None => RoaringBitmap::new(),
+        None => all_cards_bitmap(state),
     };
     for bmp in it {
         out &= bmp;
     }
     Ok(out)
+}
+
+fn all_cards_bitmap(state: &AppState) -> RoaringBitmap {
+    let span = state.manifest().total_bit_span;
+    if span == 0 {
+        return RoaringBitmap::new();
+    }
+    let mut bmp = RoaringBitmap::new();
+    bmp.insert_range(0..span);
+    bmp
 }
 
 fn bitmap_for_cost_predicate(
@@ -507,6 +642,28 @@ fn bitmap_for_cost_predicate(
         }
     }
     Ok(out)
+}
+
+fn combine_effect_bitmaps(
+    bitmaps: &[RoaringBitmap],
+    mode: EffectCombineMode,
+) -> Option<RoaringBitmap> {
+    let mut it = bitmaps.iter();
+    let first = it.next()?;
+    let mut out = first.clone();
+    match mode {
+        EffectCombineMode::And => {
+            for bmp in it {
+                out &= bmp;
+            }
+        }
+        EffectCombineMode::Or => {
+            for bmp in it {
+                out |= bmp;
+            }
+        }
+    }
+    Some(out)
 }
 
 fn effect0_bitmap_main_lines(
@@ -599,15 +756,37 @@ fn page_cards_v2(
             .card_view(card_index)
             .ok_or_else(|| bad_request(format!("missing compact record for card_index {card_index}")))?;
 
+        let family = state
+            .catalog()
+            .family_for_bit(card_index)
+            .map_err(|e| bad_request(format!("family lookup for card_index {card_index}: {e}")))?;
+
+        let faction_code = faction_from_code(view.faction_code());
+        let faction_name = alt_indexer::faction_display_name(&faction_code)
+            .unwrap_or("")
+            .to_string();
+
         out.push(CardV2 {
             reference,
+            name: family.name.clone(),
+            artist: family.artist.clone(),
+            set: CardSetV2::from(&family.set),
+            card_sub_types: family
+                .card_sub_types
+                .iter()
+                .map(|st| CardSubTypeV2 {
+                    reference: st.reference.clone(),
+                    name: st.name.clone(),
+                })
+                .collect(),
             main_cost: view.main_cost(),
             recall_cost: view.recall_cost(),
             forest_power: view.forest_power(),
             mountain_power: view.mountain_power(),
             ocean_power: view.ocean_power(),
             faction: CardFaction {
-                code: faction_from_code(view.faction_code()),
+                code: faction_code,
+                name: faction_name,
             },
             main_effect: build_main_effect_localized(&idgd_by_id, &view),
             echo_effect: build_echo_effect_localized(&idgd_by_id, &view),
@@ -762,7 +941,8 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
-    use alt_indexer::catalog::{Catalog, FamilyEntry, FACTION_ORDER};
+    use alt_indexer::catalog::{Catalog, FamilyCardSubType, FamilyEntry, FamilySet, FACTION_ORDER};
+    use alt_indexer::compact::{encode_record, CompactCardFields, RECORD_SIZE};
     use alt_indexer::faction_index::Faction;
     use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
     use alt_indexer::stat_index::StatField;
@@ -783,6 +963,17 @@ mod tests {
                 max_unique_id: 10,
                 card_count: 10,
                 first_reference: "ALT_TEST_B_AX_01_U_1".to_string(),
+                name: BTreeMap::from([("en_US".to_string(), "Test Card".to_string())]),
+                artist: "Test Artist".to_string(),
+                card_sub_types: vec![FamilyCardSubType {
+                    reference: "ENGINEER".to_string(),
+                    name: BTreeMap::from([("en_US".to_string(), "Engineer".to_string())]),
+                }],
+                set: FamilySet {
+                    reference: "COREKS".to_string(),
+                    name: "Test Set".to_string(),
+                    code: Some("BTG".to_string()),
+                },
             }],
             total_bit_span: 10,
         };
@@ -793,7 +984,7 @@ mod tests {
             kind: None,
             built_at_secs: 0,
             card_count: 10,
-            id_gd_count: 3,
+            id_gd_count: 4,
             total_bit_span: 10,
             family_count: 1,
         };
@@ -843,6 +1034,20 @@ mod tests {
                     is_main: false,
                     is_echo: true,
                 },
+                IdGdCatalogEntry {
+                    id_gd: 90,
+                    card_count: 1,
+                    bitmap_bytes: 0,
+                    bitmap_file: "90.roar".to_string(),
+                    element_type: "OUTPUT".to_string(),
+                    translations: BTreeMap::new(),
+                    m1: None,
+                    m2: None,
+                    m3: None,
+                    ec: None,
+                    is_main: true,
+                    is_echo: false,
+                },
             ],
         };
 
@@ -866,6 +1071,23 @@ mod tests {
         id_gd_per_line.insert((24, EffectLine::M2), RoaringBitmap::from_iter([2, 5]));
         id_gd_per_line.insert((191, EffectLine::M1), RoaringBitmap::from_iter([5]));
         id_gd_per_line.insert((42, EffectLine::Ec), RoaringBitmap::from_iter([5]));
+        id_gd_per_line.insert((90, EffectLine::M1), RoaringBitmap::from_iter([2]));
+
+        let mut cards = vec![0u8; 10 * RECORD_SIZE];
+        let ax_record = encode_record(&CompactCardFields {
+            faction_code: 1,
+            main_cost: 2,
+            recall_cost: 3,
+            mountain_power: 0,
+            ocean_power: 0,
+            forest_power: 0,
+            main_effect: [[0; 3]; 3],
+            echo_effect: [0; 3],
+        });
+        for &idx in &[2u32, 5] {
+            let off = idx as usize * RECORD_SIZE;
+            cards[off..off + RECORD_SIZE].copy_from_slice(&ax_record);
+        }
 
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
@@ -874,7 +1096,7 @@ mod tests {
             idgd_catalog,
             stats_summary,
             factions_summary,
-            cards: vec![0u8; 10 * alt_indexer::compact::RECORD_SIZE],
+            cards,
             id_gd_whole: BTreeMap::new(),
             id_gd_per_line,
             stats: {
@@ -947,6 +1169,24 @@ mod tests {
         assert!(!bmp.contains(2));
         assert!(bmp.contains(5));
         assert_eq!(bmp.len(), 1);
+    }
+
+    #[test]
+    fn card_v2_includes_family_metadata() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("limit".to_string(), vec!["1".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        let (page, _) = page_cards_v2(&state, &bmp, None, 1).unwrap();
+        let card = &page[0];
+        assert_eq!(card.name.get("en_US").map(String::as_str), Some("Test Card"));
+        assert_eq!(card.artist, "Test Artist");
+        assert_eq!(card.set.code.as_deref(), Some("BTG"));
+        assert_eq!(card.faction.code, "AX");
+        assert_eq!(card.faction.name, "Axiom");
+        assert_eq!(card.card_sub_types[0].reference, "ENGINEER");
     }
 
     #[test]
@@ -1044,6 +1284,72 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("mainCost".to_string(), vec!["99".to_string()]);
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        let err = parse_request(&state, &params).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn no_filters_returns_all_cards() {
+        let state = test_state();
+        let params: QueryMultiMap = HashMap::new();
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), state.manifest().total_bit_span as u64);
+        for i in 0..state.manifest().total_bit_span {
+            assert!(bmp.contains(i));
+        }
+    }
+
+    #[test]
+    fn multiple_effect_slots_combine_with_effect_mode() {
+        let state = test_state();
+        // slot 0: trigger 24 on M2 -> {2,5}; slot 1: output 90 on M1 -> {2}
+        let mut and_params: QueryMultiMap = HashMap::new();
+        and_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        and_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
+        and_params.insert("effectMode".to_string(), vec!["and".to_string()]);
+        let and_req = parse_request(&state, &and_params).unwrap();
+        let and_bmp = build_bitmap(&state, &and_req).unwrap();
+        assert!(and_bmp.contains(2));
+        assert!(!and_bmp.contains(5));
+        assert_eq!(and_bmp.len(), 1);
+
+        let mut or_params: QueryMultiMap = HashMap::new();
+        or_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        or_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
+        or_params.insert("effectMode".to_string(), vec!["or".to_string()]);
+        let or_req = parse_request(&state, &or_params).unwrap();
+        let or_bmp = build_bitmap(&state, &or_req).unwrap();
+        assert!(or_bmp.contains(2));
+        assert!(or_bmp.contains(5));
+        assert_eq!(or_bmp.len(), 2);
+
+        // default effectMode is and
+        let mut default_params: QueryMultiMap = HashMap::new();
+        default_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        default_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
+        let default_req = parse_request(&state, &default_params).unwrap();
+        assert_eq!(default_req.filters.effect_mode, EffectCombineMode::And);
+        let default_bmp = build_bitmap(&state, &default_req).unwrap();
+        assert_eq!(default_bmp.len(), 1);
+        assert!(default_bmp.contains(2));
+    }
+
+    #[test]
+    fn invalid_effect_mode_rejected() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("effectMode".to_string(), vec!["xor".to_string()]);
+        let err = parse_request(&state, &params).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn invalid_effect_param_key_rejected() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][x]".to_string(), vec!["24".to_string()]);
         let err = parse_request(&state, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }

@@ -42,7 +42,11 @@ fn make_set_index(root: &Path, set: &str, families: &[(&str, &str, u32)], idgd_b
           "family_id": family_id,
           "max_unique_id": *max_unique_id,
           "card_count": *max_unique_id,
-          "first_reference": format!("ALT_{set}_B_{faction}_{family_number}_U_1")
+          "first_reference": format!("ALT_{set}_B_{faction}_{family_number}_U_1"),
+          "name": {},
+          "artist": "",
+          "card_sub_types": [],
+          "set": { "reference": set, "name": "", "code": null }
         }));
         start_bit += *max_unique_id;
         card_count += *max_unique_id;

@@ -4,6 +4,11 @@ pub mod build;
 pub mod bench_query;
 pub mod card;
 pub mod catalog;
+pub mod faction_display;
+pub mod set_code;
+
+pub use faction_display::faction_display_name;
+pub use set_code::set_code;
 pub mod compact;
 pub mod cli;
 pub mod crawl;

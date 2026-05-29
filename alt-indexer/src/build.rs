@@ -185,12 +185,12 @@ fn index_one_card(
     mut profile: Option<&mut BuildProfile>,
     measure_phases: bool,
 ) -> Result<Option<(u64, u64, u64)>> {
-    let card_index = catalog_builder.on_card(&file.parsed)?;
     let (card, load_timings) = crate::card::load_card_timed(
         &file.path,
         profile.as_deref_mut(),
         measure_phases,
     )?;
+    let card_index = catalog_builder.on_card(&file.parsed, &card)?;
 
     let mut process = || {
         apply_card_index(

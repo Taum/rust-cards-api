@@ -33,7 +33,11 @@ fn write_mini_index(td: &TempDir) {
     "family_id": "AX_01",
     "max_unique_id": 4,
     "card_count": 2,
-    "first_reference": "ALT_TEST_B_AX_01_U_1"
+    "first_reference": "ALT_TEST_B_AX_01_U_1",
+    "name": { "en_US": "Test" },
+    "artist": "",
+    "card_sub_types": [],
+    "set": { "reference": "TEST", "name": "Test", "code": null }
   }],
   "total_bit_span": 4
 }"#;

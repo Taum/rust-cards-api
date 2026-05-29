@@ -1,6 +1,8 @@
+use crate::card::{family_metadata_from_card, CardJson};
 use crate::path::ParsedCardPath;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 pub const FACTION_ORDER: [&str; 6] = ["AX", "BR", "LY", "MU", "OR", "YZ"];
@@ -11,6 +13,28 @@ pub struct Catalog {
     pub faction_order: Vec<String>,
     pub families: Vec<FamilyEntry>,
     pub total_bit_span: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FamilySet {
+    pub reference: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FamilyCardSubType {
+    pub reference: String,
+    pub name: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FamilyMetadata {
+    pub name: BTreeMap<String, String>,
+    pub artist: String,
+    pub card_sub_types: Vec<FamilyCardSubType>,
+    pub set: FamilySet,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +51,10 @@ pub struct FamilyEntry {
     pub max_unique_id: u32,
     pub card_count: u32,
     pub first_reference: String,
+    pub name: BTreeMap<String, String>,
+    pub artist: String,
+    pub card_sub_types: Vec<FamilyCardSubType>,
+    pub set: FamilySet,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +74,7 @@ struct CurrentFamily {
     max_unique_id: u32,
     card_count: u32,
     last_unique_id: Option<u32>,
+    metadata: FamilyMetadata,
 }
 
 pub struct CatalogBuilder {
@@ -66,7 +95,9 @@ impl CatalogBuilder {
     }
 
     /// Register a card; returns global `card_index` for bitmap insertion.
-    pub fn on_card(&mut self, parsed: &ParsedCardPath) -> Result<u32> {
+    ///
+    /// `card` supplies per-family metadata captured from the first card in each family.
+    pub fn on_card(&mut self, parsed: &ParsedCardPath, card: &CardJson) -> Result<u32> {
         let family_id = parsed.family_id();
         let family_changed = self
             .current
@@ -76,7 +107,7 @@ impl CatalogBuilder {
 
         if family_changed {
             self.finalize_current()?;
-            self.start_family(parsed);
+            self.start_family(parsed, card);
         }
 
         let current = self
@@ -129,6 +160,10 @@ impl CatalogBuilder {
                 max_unique_id: c.max_unique_id,
                 card_count: c.card_count,
                 first_reference,
+                name: c.metadata.name,
+                artist: c.metadata.artist,
+                card_sub_types: c.metadata.card_sub_types,
+                set: c.metadata.set,
             });
             self.next_start_bit = self
                 .next_start_bit
@@ -138,7 +173,7 @@ impl CatalogBuilder {
         Ok(())
     }
 
-    fn start_family(&mut self, parsed: &ParsedCardPath) {
+    fn start_family(&mut self, parsed: &ParsedCardPath, card: &CardJson) {
         self.current = Some(CurrentFamily {
             family_id: parsed.family_id(),
             faction: parsed.faction.clone(),
@@ -147,6 +182,7 @@ impl CatalogBuilder {
             max_unique_id: 0,
             card_count: 0,
             last_unique_id: None,
+            metadata: family_metadata_from_card(card),
         });
     }
 }
@@ -193,13 +229,12 @@ impl Catalog {
         Ok(family.start_bit + parsed.unique_id - 1)
     }
 
-    pub fn decode_bit(&self, bit: u32) -> Result<DecodedCard> {
+    pub fn family_for_bit(&self, bit: u32) -> Result<&FamilyEntry> {
         let family = self
             .families
             .iter()
             .rfind(|f| f.start_bit <= bit)
             .ok_or_else(|| anyhow::anyhow!("bit {bit} is below first family"))?;
-
         let unique_id = bit - family.start_bit + 1;
         if unique_id > family.max_unique_id {
             anyhow::bail!(
@@ -208,7 +243,13 @@ impl Catalog {
                 family.max_unique_id
             );
         }
+        Ok(family)
+    }
 
+    pub fn decode_bit(&self, bit: u32) -> Result<DecodedCard> {
+        let family = self.family_for_bit(bit)?;
+
+        let unique_id = bit - family.start_bit + 1;
         let set = family.source_set.as_deref().unwrap_or(&self.set);
         Ok(DecodedCard {
             reference: format!(
@@ -233,8 +274,21 @@ mod tests {
     use crate::path::parse_card_path;
     use std::path::Path;
 
+    fn empty_card() -> CardJson {
+        CardJson {
+            name: None,
+            translations: None,
+            illustrator: None,
+            card_sub_types: Vec::new(),
+            card_set: None,
+            main_faction: None,
+            card_elements: Vec::new(),
+        }
+    }
+
     #[test]
     fn decode_after_build() -> Result<()> {
+        let card = empty_card();
         let mut b = CatalogBuilder::new("COREKS");
         let p1 = parse_card_path(
             Path::new("json/COREKS/AX/04/ALT_COREKS_B_AX_04_U_1.json"),
@@ -244,8 +298,8 @@ mod tests {
             Path::new("json/COREKS/AX/04/ALT_COREKS_B_AX_04_U_4200.json"),
             "COREKS",
         )?;
-        let idx1 = b.on_card(&p1)?;
-        let idx2 = b.on_card(&p2)?;
+        let idx1 = b.on_card(&p1, &card)?;
+        let idx2 = b.on_card(&p2, &card)?;
         assert_eq!(idx1, 0);
         assert_eq!(idx2, 4199);
 
@@ -257,8 +311,8 @@ mod tests {
             Path::new("json/COREKS/AX/05/ALT_COREKS_B_AX_05_U_6146.json"),
             "COREKS",
         )?;
-        let idx3 = b.on_card(&p3)?;
-        let idx4 = b.on_card(&p4)?;
+        let idx3 = b.on_card(&p3, &card)?;
+        let idx4 = b.on_card(&p4, &card)?;
         assert_eq!(idx3, 4200);
         assert_eq!(idx4, 10345);
 
@@ -276,6 +330,26 @@ mod tests {
         let bit = catalog.lookup_bit(&p)?;
         assert_eq!(bit, 10345);
         assert_eq!(catalog.decode_bit(bit)?.reference, "ALT_COREKS_B_AX_05_U_6146");
+        Ok(())
+    }
+
+    #[test]
+    fn family_metadata_stored_on_entry() -> Result<()> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/card-json/ALT_COREKS_B_AX_06_U_5.json");
+        let card = crate::card::load_card(&path, None)?;
+        let parsed = parse_card_path(
+            &Path::new("json/COREKS/AX/06/ALT_COREKS_B_AX_06_U_5.json"),
+            "COREKS",
+        )?;
+        let mut b = CatalogBuilder::new("COREKS");
+        b.on_card(&parsed, &card)?;
+        let catalog = b.into_catalog()?;
+        let family = &catalog.families[0];
+        assert_eq!(family.name.get("en_US").map(String::as_str), Some("Ogun"));
+        assert_eq!(family.artist, "Edward Cheekokseang");
+        assert_eq!(family.set.code.as_deref(), Some("BTG"));
+        assert_eq!(family.card_sub_types.len(), 2);
         Ok(())
     }
 }

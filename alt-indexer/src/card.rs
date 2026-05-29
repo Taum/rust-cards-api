@@ -1,5 +1,7 @@
 use crate::bitmap::EffectLine;
+use crate::catalog::{FamilyCardSubType, FamilySet};
 use crate::profile::BuildProfile;
+use crate::set_code;
 use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
@@ -14,9 +16,55 @@ use std::time::Instant;
 #[serde(rename_all = "camelCase")]
 pub struct CardJson {
     #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub translations: Option<BTreeMap<String, CardLocaleEntry>>,
+    #[serde(default)]
+    pub illustrator: Option<Illustrator>,
+    #[serde(default)]
+    pub card_sub_types: Vec<CardSubTypeJson>,
+    #[serde(default)]
+    pub card_set: Option<CardSetJson>,
+    #[serde(default)]
     pub main_faction: Option<MainFaction>,
     #[serde(default)]
     pub card_elements: Vec<CardElement>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardLocaleEntry {
+    #[serde(default)]
+    pub locale: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Illustrator {
+    #[serde(default)]
+    pub nick_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSubTypeJson {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub translations: Option<BTreeMap<String, CardLocaleEntry>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardSetJson {
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -234,6 +282,24 @@ mod tests {
     use crate::bitmap::EffectLine;
 
     #[test]
+    fn family_metadata_from_fixture() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/card-json/ALT_COREKS_B_AX_06_U_5.json");
+        let card = load_card(&path, None).unwrap();
+        let meta = family_metadata_from_card(&card);
+        assert_eq!(meta.name.get("en_US").map(String::as_str), Some("Ogun"));
+        assert_eq!(meta.artist, "Edward Cheekokseang");
+        assert_eq!(meta.set.reference, "COREKS");
+        assert_eq!(meta.set.code.as_deref(), Some("BTG"));
+        assert_eq!(meta.card_sub_types.len(), 2);
+        assert_eq!(meta.card_sub_types[0].reference, "ENGINEER");
+        assert_eq!(
+            meta.card_sub_types[0].name.get("en_US").map(String::as_str),
+            Some("Engineer")
+        );
+    }
+
+    #[test]
     fn id_gds_per_effect_line_reads_all_nodes_on_each_display() {
         let json = r#"{
             "cardElements": [{
@@ -252,6 +318,101 @@ mod tests {
         let pairs = id_gds_per_effect_line(&card);
         assert!(pairs.contains(&(EffectLine::M1, 24)));
         assert!(pairs.contains(&(EffectLine::M1, 191)));
+    }
+}
+
+const CARD_NAME_LOCALES: &[&str] = &["en_US", "fr_FR", "de_DE", "es_ES", "it_IT"];
+
+/// Localized card title for catalog / API (`name` field).
+pub fn localized_name_map(card: &CardJson) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    if let Some(map) = &card.translations {
+        for (key, entry) in map {
+            if let Some(name) = entry.name.as_deref().filter(|s| !s.is_empty()) {
+                out.insert(key.clone(), name.to_string());
+            }
+        }
+    }
+    if let Some(fallback) = card.name.as_deref().filter(|s| !s.is_empty()) {
+        out.entry("en_US".to_string())
+            .or_insert_with(|| fallback.to_string());
+    }
+    out
+}
+
+/// Illustrator display name.
+pub fn family_artist(card: &CardJson) -> String {
+    card.illustrator
+        .as_ref()
+        .and_then(|i| i.nick_name.clone())
+        .unwrap_or_default()
+}
+
+fn localized_subtype_names(sub: &CardSubTypeJson) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    if let Some(map) = &sub.translations {
+        for (key, entry) in map {
+            if let Some(name) = entry.name.as_deref().filter(|s| !s.is_empty()) {
+                out.insert(key.clone(), name.to_string());
+            }
+        }
+    }
+    if let Some(fallback) = sub.name.as_deref().filter(|s| !s.is_empty()) {
+        out.entry("en_US".to_string())
+            .or_insert_with(|| fallback.to_string());
+    }
+    for locale in CARD_NAME_LOCALES {
+        if !out.contains_key(*locale) {
+            if let Some(en) = out.get("en_US") {
+                out.insert(locale.to_string(), en.clone());
+            }
+        }
+    }
+    out
+}
+
+/// Subtype list for catalog / API.
+pub fn family_card_sub_types(card: &CardJson) -> Vec<FamilyCardSubType> {
+    card.card_sub_types
+        .iter()
+        .filter_map(|sub| {
+            let reference = sub.reference.as_deref()?.to_string();
+            let name = localized_subtype_names(sub);
+            if name.is_empty() {
+                return None;
+            }
+            Some(FamilyCardSubType { reference, name })
+        })
+        .collect()
+}
+
+/// Set metadata for catalog / API.
+pub fn family_set(card: &CardJson) -> FamilySet {
+    let reference = card
+        .card_set
+        .as_ref()
+        .and_then(|s| s.reference.clone())
+        .unwrap_or_default();
+    let name = card
+        .card_set
+        .as_ref()
+        .and_then(|s| s.name.clone())
+        .unwrap_or_default();
+    let code = set_code::set_code(&reference).map(str::to_string);
+    FamilySet {
+        reference,
+        name,
+        code,
+    }
+}
+
+/// All per-family metadata extracted from one card JSON.
+pub fn family_metadata_from_card(card: &CardJson) -> crate::catalog::FamilyMetadata {
+    crate::catalog::FamilyMetadata {
+        name: localized_name_map(card),
+        artist: family_artist(card),
+        card_sub_types: family_card_sub_types(card),
+        set: family_set(card),
     }
 }
 
