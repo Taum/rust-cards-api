@@ -4,6 +4,22 @@ export type EffectSlot = {
   o: string;
 };
 
+/** One row from `GET /api/v2/effects`. */
+export type EffectCatalogItem = {
+  idGd: number;
+  text: Record<string, string>;
+  isEcho?: boolean;
+  isMain?: boolean;
+};
+
+export type EffectsCatalogResponse = {
+  triggers: EffectCatalogItem[];
+  conditions: EffectCatalogItem[];
+  output: EffectCatalogItem[];
+};
+
+export type EffectsCatalogStatus = 'loading' | 'ready' | 'error';
+
 export type EffectMode = 'and' | 'or';
 
 export type FilterState = {

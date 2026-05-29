@@ -3,6 +3,7 @@ import { FilterPanel } from './components/FilterPanel';
 import { QueryPreview } from './components/QueryPreview';
 import { ResultsPanel } from './components/ResultsPanel';
 import { useCardsQuery } from './hooks/useCardsQuery';
+import { useEffectsCatalog } from './hooks/useEffectsCatalog';
 import { CARD_LOCALES, DEFAULT_CARD_LOCALE, type CardLocale } from './locale';
 import { DEFAULT_FILTER_STATE, type FilterState } from './types';
 
@@ -12,6 +13,7 @@ export default function App() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
   const [locale, setLocale] = useState<CardLocale>(DEFAULT_CARD_LOCALE);
   const query = useCardsQuery(filters);
+  const effects = useEffectsCatalog();
 
   const clearFilters = () => {
     setFilters(DEFAULT_FILTER_STATE);
@@ -56,6 +58,10 @@ export default function App() {
           onClear={clearFilters}
           handCostError={query.handCostError}
           reserveCostError={query.reserveCostError}
+          effectsCatalog={effects.catalog}
+          effectsStatus={effects.status}
+          effectsError={effects.error}
+          locale={locale}
         />
 
         <div className="min-w-0 space-y-4">

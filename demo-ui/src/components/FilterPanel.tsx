@@ -1,6 +1,13 @@
 import { activeEffectSlotCount } from '../api/buildQuery';
+import type { CardLocale } from '../locale';
+import {
+  FACTIONS,
+  type EffectMode,
+  type EffectsCatalogResponse,
+  type EffectsCatalogStatus,
+  type FilterState,
+} from '../types';
 import { EffectSlotFields } from './EffectSlotFields';
-import { FACTIONS, type EffectMode, type FilterState } from '../types';
 
 type FilterPanelProps = {
   filters: FilterState;
@@ -8,6 +15,10 @@ type FilterPanelProps = {
   onClear: () => void;
   handCostError?: string | null;
   reserveCostError?: string | null;
+  effectsCatalog: EffectsCatalogResponse | null;
+  effectsStatus: EffectsCatalogStatus;
+  effectsError: string | null;
+  locale: CardLocale;
 };
 
 export function FilterPanel({
@@ -16,7 +27,12 @@ export function FilterPanel({
   onClear,
   handCostError,
   reserveCostError,
+  effectsCatalog,
+  effectsStatus,
+  effectsError,
+  locale,
 }: FilterPanelProps) {
+  const effectsLoading = effectsStatus === 'loading';
   const setFilters = (patch: Partial<FilterState>) => {
     onChange({ ...filters, ...patch });
   };
@@ -104,6 +120,15 @@ export function FilterPanel({
             </div>
           )}
         </div>
+        {effectsLoading && (
+          <p className="text-xs text-slate-500">Loading effects catalog…</p>
+        )}
+        {effectsStatus === 'error' && effectsError && (
+          <p className="text-xs text-amber-400">
+            Could not load effects list ({effectsError}). You can still type idGd
+            values manually.
+          </p>
+        )}
         {filters.effects.map((slot, index) => (
           <EffectSlotFields
             key={index}
@@ -112,6 +137,9 @@ export function FilterPanel({
             onChange={(next) => updateEffectSlot(index, next)}
             removable={index > 0}
             onRemove={() => removeEffectSlot(index)}
+            catalog={effectsCatalog}
+            effectsLoading={effectsLoading}
+            locale={locale}
           />
         ))}
         <button
@@ -129,6 +157,9 @@ export function FilterPanel({
           title="Support"
           slot={filters.support}
           onChange={(support) => setFilters({ support })}
+          catalog={effectsCatalog}
+          effectsLoading={effectsLoading}
+          locale={locale}
         />
       </section>
 

@@ -1,4 +1,6 @@
-import type { EffectSlot } from '../types';
+import type { CardLocale } from '../locale';
+import type { EffectCatalogItem, EffectSlot, EffectsCatalogResponse } from '../types';
+import { EffectIdCombobox } from './EffectIdCombobox';
 
 type EffectSlotFieldsProps = {
   slotIndex?: number;
@@ -7,7 +9,12 @@ type EffectSlotFieldsProps = {
   onChange: (slot: EffectSlot) => void;
   onRemove?: () => void;
   removable?: boolean;
+  catalog: EffectsCatalogResponse | null;
+  effectsLoading: boolean;
+  locale: CardLocale;
 };
+
+const EMPTY_OPTIONS: EffectCatalogItem[] = [];
 
 export function EffectSlotFields({
   slotIndex,
@@ -16,12 +23,20 @@ export function EffectSlotFields({
   onChange,
   onRemove,
   removable = false,
+  catalog,
+  effectsLoading,
+  locale,
 }: EffectSlotFieldsProps) {
   const heading =
     title ?? (slotIndex !== undefined ? `Effect [${slotIndex}]` : 'Effect');
   const update = (field: keyof EffectSlot, value: string) => {
     onChange({ ...slot, [field]: value });
   };
+
+  const triggers = catalog?.triggers ?? EMPTY_OPTIONS;
+  const conditions = catalog?.conditions ?? EMPTY_OPTIONS;
+  const outputs = catalog?.output ?? EMPTY_OPTIONS;
+  const comboboxDisabled = effectsLoading;
 
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/60 p-3">
@@ -38,36 +53,33 @@ export function EffectSlotFields({
         )}
       </div>
       <div className="grid gap-2 sm:grid-cols-3">
-        <label className="block text-xs text-slate-400">
-          Trigger (t)
-          <input
-            type="text"
-            value={slot.t}
-            onChange={(e) => update('t', e.target.value)}
-            placeholder="e.g. 24,191"
-            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-        <label className="block text-xs text-slate-400">
-          Condition (c)
-          <input
-            type="text"
-            value={slot.c}
-            onChange={(e) => update('c', e.target.value)}
-            placeholder="e.g. 191"
-            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-        <label className="block text-xs text-slate-400">
-          Output (o)
-          <input
-            type="text"
-            value={slot.o}
-            onChange={(e) => update('o', e.target.value)}
-            placeholder="e.g. 90"
-            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-          />
-        </label>
+        <EffectIdCombobox
+          label="Trigger (t)"
+          value={slot.t}
+          onChange={(v) => update('t', v)}
+          options={triggers}
+          locale={locale}
+          disabled={comboboxDisabled}
+          placeholder="e.g. 24,191"
+        />
+        <EffectIdCombobox
+          label="Condition (c)"
+          value={slot.c}
+          onChange={(v) => update('c', v)}
+          options={conditions}
+          locale={locale}
+          disabled={comboboxDisabled}
+          placeholder="e.g. 191"
+        />
+        <EffectIdCombobox
+          label="Output (o)"
+          value={slot.o}
+          onChange={(v) => update('o', v)}
+          options={outputs}
+          locale={locale}
+          disabled={comboboxDisabled}
+          placeholder="e.g. 90"
+        />
       </div>
     </div>
   );
