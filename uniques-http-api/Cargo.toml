@@ -7,6 +7,7 @@ edition = "2024"
 alt-indexer = { path = "../alt-indexer" }
 anyhow = "1"
 axum = "0.8.4"
+tower-http = { version = "0.6", features = ["cors"] }
 roaring = "0.10"
 serde_json = "1.0.143"
 tokio = { version = "1", features = ["full"] }

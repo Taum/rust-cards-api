@@ -34,3 +34,26 @@ async fn health_returns_hello_world_json() {
         br#"{"message":"Hello World"}"#.as_ref()
     );
 }
+
+#[tokio::test]
+async fn cors_allows_any_origin() {
+    let response = app(test_state())
+        .oneshot(
+            axum::http::Request::builder()
+                .uri("/health")
+                .header(axum::http::header::ORIGIN, "https://example.com")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response
+            .headers()
+            .get(axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .and_then(|v| v.to_str().ok()),
+        Some("*")
+    );
+}
