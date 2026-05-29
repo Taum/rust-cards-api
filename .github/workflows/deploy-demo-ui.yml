@@ -20,8 +20,30 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate VITE_API_BASE_URL
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_API_BASE_URL// }" ]; then
+            echo "::error title=Missing VITE_API_BASE_URL::Set VITE_API_BASE_URL before deploying. Add it under Settings → Secrets and variables → Actions → Variables (repository), or on the github-pages environment. Use the API origin only (e.g. https://your-service.run.app), with no /api path and no trailing slash."
+            exit 1
+          fi
+          case "$VITE_API_BASE_URL" in
+            */api|*/api/)
+              echo "::error title=Invalid VITE_API_BASE_URL::Use the API origin only (scheme + host). The demo-ui appends /api/v2/... — do not include /api in this variable."
+              exit 1
+              ;;
+            */)
+              echo "::error title=Invalid VITE_API_BASE_URL::Remove the trailing slash. Example: https://your-service.run.app"
+              exit 1
+              ;;
+          esac
+          echo "VITE_API_BASE_URL is set."
 
       - uses: actions/setup-node@v4
         with:

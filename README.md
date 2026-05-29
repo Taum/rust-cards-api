@@ -8,13 +8,19 @@ This repo builds a compact binary index (~270 MB for all sets merged) and serv
 
 Notes that at this stage, this project only handles **Unique** characters. It does not serve and Common, Rare or Exalted cards. It could be expanded to serve them, but it was not its main purpose.
 
+## Demo
+
+Access the demo at https://taum.github.io/rust-cards-api/
+
 ## Crates
 
-| Directory | Description |
-|-----------|-------------|
-| [`alt-indexer/`](alt-indexer/) | Build and merge the index from card JSON |
-| [`uniques-http-api/`](uniques-http-api/) | Load the index and expose the REST API |
-| [`demo-ui/`](demo-ui/) | Browser demo UI (optional) |
+
+| Directory                                | Description                              |
+| ---------------------------------------- | ---------------------------------------- |
+| `[alt-indexer/](alt-indexer/)`           | Build and merge the index from card JSON |
+| `[uniques-http-api/](uniques-http-api/)` | Load the index and expose the REST API   |
+| `[demo-ui/](demo-ui/)`                   | Browser demo UI (optional)               |
+
 
 ## Documentation
 
@@ -26,21 +32,24 @@ Notes that at this stage, this project only handles **Unique** characters. It do
 
 1. Install Rust
 
-Follow instructions at https://rust-lang.org/tools/install/
+Follow instructions at [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
 
-2. Run or build sub-project
+1. Run or build sub-project
 
 First go to the sub-project you want to work with:
+
 ```
 cd alt-indexer
 ```
 
 Then you can either "run" (compile & run)
+
 ```
 cargo run -- --help
 ```
 
 Or "build" the project for release, before running it:
+
 ```
 cargo build --release
 .\target\release\alt-indexer.exe --help # adjust to match your OS
@@ -52,4 +61,4 @@ See [CLI Reference](./docs/cli-reference.md) for Command Line examples.
 
 A [Dockerfile](./Dockerfile) builds the HTTP server image with embedded index.
 
-The expected process is to build the index first from the AlteredEquinox repositories, then the Docker image will embed a copy of it.
+The expected process is to build the index first (into `alt-indexer/full_index`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.

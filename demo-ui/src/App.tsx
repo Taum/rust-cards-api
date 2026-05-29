@@ -9,6 +9,7 @@ import { CARD_LOCALES, DEFAULT_CARD_LOCALE, type CardLocale } from './locale';
 import { DEFAULT_FILTER_STATE, type FilterState } from './types';
 
 const CONTENT_WIDTH = 'w-[1600px] max-w-[calc(100%-2rem)]';
+const REPO_URL = 'https://github.com/Taum/rust-cards-api';
 
 export default function App() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTER_STATE);
@@ -27,8 +28,16 @@ export default function App() {
         <div
           className={`mx-auto flex flex-wrap items-center justify-between gap-4 ${CONTENT_WIDTH}`}
         >
-          <div>
+          <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-xl font-bold text-slate-50">Cards API Demo</h1>
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-slate-400 hover:text-sky-300 hover:underline"
+            >
+              GitHub: Taum/rust-cards-api
+            </a>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <a
