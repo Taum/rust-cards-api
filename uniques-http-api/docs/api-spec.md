@@ -55,6 +55,7 @@ The response is a JSON files which includes the total number of matches, a page 
       name: {
         en_US: "Ayxas, Repented Tyrant",
         fr_FR: "Ayxas, Tyran Repenti"
+        ...
       },
       artist: "Artist Name",
       set: {
@@ -65,7 +66,7 @@ The response is a JSON files which includes the total number of matches, a page 
       cardSubTypes: [
         {
           reference: "NOBLE",
-          name: { en_US: "Noble", fr_FR: "Noble" }
+          name: { en_US: "Noble", fr_FR: "Noble", ... }
         }
       ],
       mainCost: 2,
@@ -99,3 +100,79 @@ The response is a JSON files which includes the total number of matches, a page 
   ]
 }
 ```
+
+
+## GET /api/v2/effects Response
+
+This endpoint takes no parameters.
+
+It returns a list of the Effect parts available for filtering.
+
+```
+{
+  triggers: [
+    {
+      idGd: 1,
+      text: {
+        en_US: "{R}",
+        fr_FR: "{R}",
+        de_DE: ...
+        es_ES: ...
+        it_IT: ...
+      },
+      isEcho: false,
+      isMain: true,
+    },
+    {
+      idGd: 2,
+      text: {
+        en_US: "When an opponent draws one or more cards or does [RESUPPLY_T] —",
+        fr_FR: "Lorsqu'un adversaire pioche au moins une carte ou [RESUPPLY_T] —",
+        de_DE: ...
+        es_ES: ...
+        it_IT: ...
+      }
+    },
+    ...
+  ],
+  conditions: [
+    {
+      idGd: 166,
+      text: {
+        en_US: "If you control two or more Plants other than me:",
+        fr_FR: ...
+        de_DE: ...
+        es_ES: ...
+        it_IT: ...
+      },
+      isEcho: false,
+      isMain: true,
+    },
+    {
+      idGd: 167,
+      text: {
+        en_US: "If there are three or more base statistics of 0 among Characters you control:",
+        fr_FR: ...
+        de_DE: ...
+        es_ES: ...
+        it_IT: ...
+      }
+    },
+    ...
+  ],
+  output: [
+    {
+      idGd: 193,
+      text: {
+        en_US: "[AFTER_YOU].",
+        fr_FR: ...
+        de_DE: ...
+        es_ES: ...
+        it_IT: ...
+      }
+    },
+    ...
+  ]
+}
+```
+

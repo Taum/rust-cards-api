@@ -15,6 +15,7 @@ fn loads_minimal_fixture_index() {
     assert!(state.id_gd_per_line().is_empty());
     assert!(state.stats().is_empty());
     assert!(state.factions().is_empty());
+    assert!(!state.effects_body().is_empty());
 
     let reference = state.decode_reference(0).expect("decode card 0");
     assert_eq!(reference, "ALT_TEST_B_AX_04_U_1");

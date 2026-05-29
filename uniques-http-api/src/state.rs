@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use axum::body::Bytes;
 use alt_indexer::bitmap::EffectLine;
 use alt_indexer::catalog::Catalog;
 use alt_indexer::compact::{CompactCardView, RECORD_SIZE};
@@ -33,6 +34,8 @@ pub struct AppStateInner {
     /// Stat bucket bitmaps keyed by field and value 0..15.
     pub stats: BTreeMap<StatField, [RoaringBitmap; 16]>,
     pub factions: BTreeMap<Faction, RoaringBitmap>,
+    /// Pre-serialized `GET /api/v2/effects` JSON body.
+    pub effects_body: Arc<Bytes>,
 }
 
 impl AppState {
@@ -82,6 +85,10 @@ impl AppState {
 
     pub fn factions(&self) -> &BTreeMap<Faction, RoaringBitmap> {
         &self.inner.factions
+    }
+
+    pub fn effects_body(&self) -> &Arc<Bytes> {
+        &self.inner.effects_body
     }
 
     pub fn card_view(&self, card_index: u32) -> Option<CompactCardView<'_>> {

@@ -1,4 +1,41 @@
 {
   "set": "TEST",
-  "entries": []
+  "entries": [
+    {
+      "id_gd": 1,
+      "card_count": 1,
+      "bitmap_bytes": 0,
+      "bitmap_file": "1.roar",
+      "element_type": "TRIGGER",
+      "translations": {
+        "en_US": { "locale": "en_US", "text": "{R}" }
+      },
+      "is_main": true,
+      "is_echo": false
+    },
+    {
+      "id_gd": 2,
+      "card_count": 1,
+      "bitmap_bytes": 0,
+      "bitmap_file": "2.roar",
+      "element_type": "CONDITION",
+      "translations": {
+        "en_US": { "locale": "en_US", "text": "If you control two or more Plants:" }
+      },
+      "is_main": true,
+      "is_echo": false
+    },
+    {
+      "id_gd": 3,
+      "card_count": 1,
+      "bitmap_bytes": 0,
+      "bitmap_file": "3.roar",
+      "element_type": "OUTPUT",
+      "translations": {
+        "en_US": { "locale": "en_US", "text": "[AFTER_YOU]." }
+      },
+      "is_main": false,
+      "is_echo": false
+    }
+  ]
 }

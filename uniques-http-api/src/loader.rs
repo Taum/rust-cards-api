@@ -13,6 +13,7 @@ use anyhow::{bail, Context, Result};
 use roaring::RoaringBitmap;
 use serde::Deserialize;
 
+use crate::effects::{build_effects_list, serialize_effects_list};
 use crate::state::{AppState, AppStateInner};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -107,6 +108,16 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
     let factions = load_factions(&index_dir, &factions_summary)?;
     eprintln!("  faction bitmaps: {}", factions.len());
 
+    let effects_list = build_effects_list(&idgd_catalog);
+    let effects_body = Arc::new(serialize_effects_list(&effects_list)?);
+    eprintln!(
+        "  effects list: {} triggers, {} conditions, {} outputs ({} bytes JSON)",
+        effects_list.triggers.len(),
+        effects_list.conditions.len(),
+        effects_list.output.len(),
+        effects_body.len()
+    );
+
     eprintln!("index load complete");
 
     Ok(AppState::new(Arc::new(AppStateInner {
@@ -121,6 +132,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         id_gd_per_line,
         stats,
         factions,
+        effects_body,
     })))
 }
 

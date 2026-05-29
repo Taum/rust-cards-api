@@ -1089,11 +1089,15 @@ mod tests {
             cards[off..off + RECORD_SIZE].copy_from_slice(&ax_record);
         }
 
+        let effects_list = crate::effects::build_effects_list(&idgd_catalog);
+        let effects_body = Arc::new(crate::effects::serialize_effects_list(&effects_list).unwrap());
+
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
             catalog,
             manifest,
             idgd_catalog,
+            effects_body,
             stats_summary,
             factions_summary,
             cards,
