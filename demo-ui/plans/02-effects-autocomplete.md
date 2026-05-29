@@ -28,6 +28,10 @@ Load `GET /api/v2/effects` at startup and replace plain idGd text inputs with au
 - On select: replace token with `idGd`, keep prior comma-separated ids
 - Manual typing still works if catalog fails to load
 
+## Effect slot indexing in query params
+
+Empty UI boxes (no t, c, or o) are omitted when building the URL. Active slots are compacted to sequential API indices: if box 0 is empty and box 1 has `c=166`, the query uses `effect[0][c]=166`, not `effect[1][c]`. Implemented in `buildQuery.ts` via `slotHasValues` + a running `effectIndex`.
+
 ## Deferred
 
 - Filter support fields by `isEcho` only

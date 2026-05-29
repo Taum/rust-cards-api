@@ -27,10 +27,6 @@ export default function App() {
         >
           <div>
             <h1 className="text-xl font-bold text-slate-50">Cards API Demo</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Live query builder for{' '}
-              <code className="text-sky-300">GET /api/v2/cards</code>
-            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <span className="text-slate-400">Locale</span>

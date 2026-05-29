@@ -51,7 +51,7 @@ export function AlteredCardSlot({ card, locale }: AlteredCardSlotProps) {
   return (
     <div
       ref={slotRef}
-      className="aspect-[744/1039] w-full overflow-hidden rounded border border-slate-700/80 bg-slate-950/50"
+      className="aspect-[744/1039] w-full overflow-hidden rounded-lg"
       data-card-ref={card.reference}
     />
   );

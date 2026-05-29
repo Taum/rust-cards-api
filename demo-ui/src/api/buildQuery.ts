@@ -45,14 +45,17 @@ export function buildQuery(state: FilterState): BuildQueryResult {
   let handCostError: string | undefined;
   let reserveCostError: string | undefined;
 
-  state.effects.forEach((slot, index) => {
+  // Skip empty UI slots; compact active slots to effect[0], effect[1], …
+  let effectIndex = 0;
+  for (const slot of state.effects) {
     if (!slotHasValues(slot)) {
-      return;
+      continue;
     }
-    appendEffectField(params, index, 't', slot.t);
-    appendEffectField(params, index, 'c', slot.c);
-    appendEffectField(params, index, 'o', slot.o);
-  });
+    appendEffectField(params, effectIndex, 't', slot.t);
+    appendEffectField(params, effectIndex, 'c', slot.c);
+    appendEffectField(params, effectIndex, 'o', slot.o);
+    effectIndex += 1;
+  }
 
   if (activeEffectSlotCount(state) >= 2 && state.effectMode === 'or') {
     params.set('effectMode', 'or');

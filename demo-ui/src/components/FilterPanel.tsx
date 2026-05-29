@@ -50,7 +50,7 @@ export function FilterPanel({
   };
 
   const removeEffectSlot = (index: number) => {
-    if (index === 0) {
+    if (filters.effects.length <= 1) {
       return;
     }
     setFilters({
@@ -135,7 +135,7 @@ export function FilterPanel({
             slotIndex={index}
             slot={slot}
             onChange={(next) => updateEffectSlot(index, next)}
-            removable={index > 0}
+            removable={filters.effects.length > 1}
             onRemove={() => removeEffectSlot(index)}
             catalog={effectsCatalog}
             effectsLoading={effectsLoading}
