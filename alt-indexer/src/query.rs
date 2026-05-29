@@ -726,7 +726,8 @@ mod tests {
                 m2: None,
                 m3: None,
                 ec: None,
-                is_echo: Some(false),
+                is_main: true,
+                is_echo: false,
             });
         }
         let cat = IdGdCatalog {

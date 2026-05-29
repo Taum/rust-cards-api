@@ -27,8 +27,37 @@ pub struct IdGdCatalogEntry {
     pub m3: Option<BitmapMeta>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ec: Option<BitmapMeta>,
-    /// `false` = MAIN_EFFECT only, `true` = ECHO_EFFECT only, `null` = seen in both (build error).
-    pub is_echo: Option<bool>,
+    /// `true` if this idGd appeared on a main effect line (m1/m2/m3) at least once.
+    #[serde(default)]
+    pub is_main: bool,
+    /// `true` if this idGd appeared on an echo effect line (ec) at least once.
+    #[serde(default)]
+    pub is_echo: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EffectRegionFlags {
+    pub is_main: bool,
+    pub is_echo: bool,
+}
+
+impl EffectRegionFlags {
+    pub fn from_seen(seen_main: bool, seen_echo: bool) -> Self {
+        Self {
+            is_main: seen_main,
+            is_echo: seen_echo,
+        }
+    }
+
+    /// OR-merge flags from multiple source catalogs (per-set or cross-set).
+    pub fn merge<'a>(sources: impl IntoIterator<Item = &'a Self>) -> Self {
+        let mut out = Self::default();
+        for s in sources {
+            out.is_main |= s.is_main;
+            out.is_echo |= s.is_echo;
+        }
+        out
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,52 +78,6 @@ struct DraftEntry {
     translations: BTreeMap<String, LocaleText>,
     seen_main: bool,
     seen_echo: bool,
-}
-
-/// Derive catalog `is_echo` from which effect regions referenced this idGd during build.
-pub fn is_echo_from_flags(seen_main: bool, seen_echo: bool, id_gd: u32) -> Option<bool> {
-    match (seen_main, seen_echo) {
-        (true, false) => Some(false),
-        (false, true) => Some(true),
-        (true, true) => {
-            eprintln!("error: idGd {id_gd} appears in both MAIN_EFFECT and ECHO_EFFECT");
-            None
-        }
-        (false, false) => None,
-    }
-}
-
-/// Combine `is_echo` values when merging per-set catalogs.
-pub fn merge_is_echo_values(values: &[Option<bool>], id_gd: u32) -> Option<bool> {
-    let mut saw_null = false;
-    let mut saw_true = false;
-    let mut saw_false = false;
-    for v in values {
-        match v {
-            None => saw_null = true,
-            Some(true) => saw_true = true,
-            Some(false) => saw_false = true,
-        }
-    }
-    if saw_true && saw_false {
-        eprintln!(
-            "error: idGd {id_gd} has conflicting is_echo across merged source catalogs (main vs echo)"
-        );
-        return None;
-    }
-    if saw_null && (saw_true || saw_false) {
-        eprintln!(
-            "error: idGd {id_gd} has is_echo=null in one source catalog but a definite value in another"
-        );
-        return None;
-    }
-    if saw_true {
-        Some(true)
-    } else if saw_false {
-        Some(false)
-    } else {
-        None
-    }
 }
 
 impl IdGdCatalogBuilder {
@@ -139,13 +122,17 @@ impl IdGdCatalogBuilder {
         let mut entries = Vec::with_capacity(bitmaps.len());
         for (&id_gd, bitmap) in bitmaps.iter() {
             let draft = self.entries.get(&id_gd);
-            let (element_type, translations, is_echo) = match draft {
+            let (element_type, translations, flags) = match draft {
                 Some(d) => (
                     d.element_type.clone(),
                     d.translations.clone(),
-                    is_echo_from_flags(d.seen_main, d.seen_echo, id_gd),
+                    EffectRegionFlags::from_seen(d.seen_main, d.seen_echo),
                 ),
-                None => ("UNKNOWN".to_string(), BTreeMap::new(), None),
+                None => (
+                    "UNKNOWN".to_string(),
+                    BTreeMap::new(),
+                    EffectRegionFlags::default(),
+                ),
             };
 
             let line_meta = |line: EffectLine| -> Option<BitmapMeta> {
@@ -175,7 +162,8 @@ impl IdGdCatalogBuilder {
                 m2: line_meta(EffectLine::M2),
                 m3: line_meta(EffectLine::M3),
                 ec: line_meta(EffectLine::Ec),
-                is_echo,
+                is_main: flags.is_main,
+                is_echo: flags.is_echo,
             });
         }
         IdGdCatalog {
@@ -196,17 +184,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn is_echo_from_flags_main_only() {
-        assert_eq!(is_echo_from_flags(true, false, 1), Some(false));
+    fn effect_region_flags_from_seen_main_only() {
+        let f = EffectRegionFlags::from_seen(true, false);
+        assert!(f.is_main);
+        assert!(!f.is_echo);
     }
 
     #[test]
-    fn is_echo_from_flags_echo_only() {
-        assert_eq!(is_echo_from_flags(false, true, 2), Some(true));
+    fn effect_region_flags_from_seen_echo_only() {
+        let f = EffectRegionFlags::from_seen(false, true);
+        assert!(!f.is_main);
+        assert!(f.is_echo);
     }
 
     #[test]
-    fn is_echo_from_flags_both_is_null() {
-        assert_eq!(is_echo_from_flags(true, true, 3), None);
+    fn effect_region_flags_from_seen_both() {
+        let f = EffectRegionFlags::from_seen(true, true);
+        assert!(f.is_main);
+        assert!(f.is_echo);
+    }
+
+    #[test]
+    fn effect_region_flags_merge_uses_or() {
+        let a = EffectRegionFlags {
+            is_main: true,
+            is_echo: false,
+        };
+        let b = EffectRegionFlags {
+            is_main: false,
+            is_echo: true,
+        };
+        let merged = EffectRegionFlags::merge([&a, &b]);
+        assert!(merged.is_main);
+        assert!(merged.is_echo);
     }
 }

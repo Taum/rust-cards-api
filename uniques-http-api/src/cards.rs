@@ -812,7 +812,8 @@ mod tests {
                     m2: None,
                     m3: None,
                     ec: None,
-                    is_echo: Some(false),
+                    is_main: true,
+                    is_echo: false,
                 },
                 IdGdCatalogEntry {
                     id_gd: 191,
@@ -825,7 +826,8 @@ mod tests {
                     m2: None,
                     m3: None,
                     ec: None,
-                    is_echo: Some(false),
+                    is_main: true,
+                    is_echo: false,
                 },
                 IdGdCatalogEntry {
                     id_gd: 42,
@@ -838,7 +840,8 @@ mod tests {
                     m2: None,
                     m3: None,
                     ec: None,
-                    is_echo: Some(true),
+                    is_main: false,
+                    is_echo: true,
                 },
             ],
         };

@@ -94,6 +94,7 @@ fn make_set_index(root: &Path, set: &str, families: &[(&str, &str, u32)], idgd_b
             "bitmap_file": format!("{id}.roar"),
             "element_type": "TRIGGER",
             "translations": {},
+            "is_main": true,
             "is_echo": false,
             "m1": { "card_count": 0, "bitmap_bytes": 0, "bitmap_file": format!("{id}_m1.roar") }
           })).collect::<Vec<_>>()
