@@ -17,7 +17,7 @@ use crate::AppState;
 pub struct EffectsListResponse {
     pub triggers: Vec<EffectPartWithRegion>,
     pub conditions: Vec<EffectPartWithRegion>,
-    pub output: Vec<EffectPart>,
+    pub output: Vec<EffectPartWithRegion>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,13 +27,6 @@ pub struct EffectPartWithRegion {
     pub text: BTreeMap<String, String>,
     pub is_echo: bool,
     pub is_main: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EffectPart {
-    pub id_gd: u32,
-    pub text: BTreeMap<String, String>,
 }
 
 /// Build the effects list from `idgd_catalog.json` entries.
@@ -46,7 +39,7 @@ pub fn build_effects_list(catalog: &IdGdCatalog) -> EffectsListResponse {
         match entry.element_type.as_str() {
             "TRIGGER" => triggers.push(effect_part_with_region(entry)),
             "CONDITION" => conditions.push(effect_part_with_region(entry)),
-            "OUTPUT" => output.push(effect_part(entry)),
+            "OUTPUT" => output.push(effect_part_with_region(entry)),
             _ => {}
         }
     }
@@ -74,13 +67,6 @@ fn effect_part_with_region(entry: &IdGdCatalogEntry) -> EffectPartWithRegion {
         text: translations_to_text(&entry.translations),
         is_echo: entry.is_echo,
         is_main: entry.is_main,
-    }
-}
-
-fn effect_part(entry: &IdGdCatalogEntry) -> EffectPart {
-    EffectPart {
-        id_gd: entry.id_gd,
-        text: translations_to_text(&entry.translations),
     }
 }
 
