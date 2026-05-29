@@ -94,6 +94,7 @@ export function EffectSlotFields({
           locale={locale}
           disabled={comboboxDisabled}
           placeholder="e.g. 90"
+          menuAlign="end"
         />
       </div>
       <EffectSlotSelectionSummary
