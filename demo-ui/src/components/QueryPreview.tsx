@@ -47,7 +47,7 @@ export function QueryPreview({ queryString, url }: QueryPreviewProps) {
   };
 
   return (
-    <section className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+    <section className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold text-slate-200">

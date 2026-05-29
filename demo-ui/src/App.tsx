@@ -22,8 +22,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-4">
+    <div className="flex h-full flex-col overflow-hidden bg-slate-950">
+      <header className="shrink-0 border-b border-slate-800 bg-slate-900/80 px-4 py-4">
         <div
           className={`mx-auto flex flex-wrap items-center justify-between gap-4 ${CONTENT_WIDTH}`}
         >
@@ -59,7 +59,7 @@ export default function App() {
       </header>
 
       <main
-        className={`mx-auto grid ${CONTENT_WIDTH} gap-6 p-4 lg:grid-cols-[minmax(320px,540px)_minmax(0,1fr)] lg:gap-8 lg:py-6`}
+        className={`mx-auto grid min-h-0 flex-1 ${CONTENT_WIDTH} gap-6 p-4 lg:grid-cols-[minmax(320px,540px)_minmax(0,1fr)] lg:gap-8 lg:py-6`}
       >
         <FilterPanel
           filters={filters}
@@ -73,7 +73,7 @@ export default function App() {
           locale={locale}
         />
 
-        <div className="min-w-0 space-y-4">
+        <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <QueryPreview queryString={query.queryString} url={query.url} />
           <ResultsPanel query={query} locale={locale} />
         </div>

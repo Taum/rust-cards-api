@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import type { CardsQueryState } from '../hooks/useCardsQuery';
 import type { CardLocale } from '../locale';
 
@@ -11,15 +9,13 @@ type ResultsPanelProps = {
 };
 
 export function ResultsPanel({ query, locale }: ResultsPanelProps) {
-  const [jsonOpen, setJsonOpen] = useState(false);
-
   const { status, data, error, durationMs, skipped } = query;
   const cardCount = data?.cards.length ?? 0;
   const total = data?.iter.total;
 
   return (
-    <section className="space-y-4">
-      <div className="rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
+    <section className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
         {status === 'loading' && (
           <span className="text-sky-300">Loading…</span>
         )}
@@ -49,26 +45,9 @@ export function ResultsPanel({ query, locale }: ResultsPanelProps) {
       </div>
 
       {status === 'success' && data && (
-        <>
-          <div className="max-h-[100%] overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2">
-            <CardList cards={data.cards} locale={locale} />
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={() => setJsonOpen((open) => !open)}
-              className="text-sm text-slate-400 hover:text-slate-200"
-            >
-              {jsonOpen ? '▼' : '▶'} Raw JSON
-            </button>
-            {jsonOpen && (
-              <pre className="mt-2 max-h-96 overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs text-slate-300">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            )}
-          </div>
-        </>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2">
+          <CardList cards={data.cards} locale={locale} />
+        </div>
       )}
     </section>
   );

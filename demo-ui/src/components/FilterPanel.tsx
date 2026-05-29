@@ -72,7 +72,7 @@ export function FilterPanel({
   };
 
   return (
-    <aside className="space-y-5 overflow-visible">
+    <aside className="min-h-0 space-y-5 overflow-y-auto">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-100">Filters</h2>
         <button
