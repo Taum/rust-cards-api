@@ -17,17 +17,17 @@ All bitmaps are **preloaded in memory** (no per-query disk I/O timing), per your
 
 ## Integration points in this repo
 
-- CLI entrypoint is `[src/cli.rs](./src\cli.rs)` and currently supports `build`, `decode`, `query`, `merge`.
+- CLI entrypoint is `[src/cli.rs](./src/cli.rs)` and currently supports `build`, `decode`, `query`, `merge`.
 - Query decoding helpers already exist:
-  - `Catalog::load` and `Catalog::decode_bit` in `[src/catalog.rs](./src\catalog.rs)`
-  - Bitmap loading via `BitmapStore::load` in `[src/bitmap.rs](./src\bitmap.rs)`
-  - The list-style query currently decodes references in `query::query_id_gd` in `[src/query.rs](./src\query.rs)`
-- Compact card decoding from `cards.bin` lives in `[src/compact.rs](./src\compact.rs)`: `CompactCardView::from_data` + accessors like `main_cost()`, `main_effect_group(g)`, `echo_effect()`.
-- Available idGd universe is in `idgd_catalog.json` (struct in `[src/idgd_catalog.rs](./src\idgd_catalog.rs)`), which provides `entries[].id_gd` and `bitmap_file`.
+  - `Catalog::load` and `Catalog::decode_bit` in `[src/catalog.rs](./src/catalog.rs)`
+  - Bitmap loading via `BitmapStore::load` in `[src/bitmap.rs](./src/bitmap.rs)`
+  - The list-style query currently decodes references in `query::query_id_gd` in `[src/query.rs](./src/query.rs)`
+- Compact card decoding from `cards.bin` lives in `[src/compact.rs](./src/compact.rs)`: `CompactCardView::from_data` + accessors like `main_cost()`, `main_effect_group(g)`, `echo_effect()`.
+- Available idGd universe is in `idgd_catalog.json` (struct in `[src/idgd_catalog.rs](./src/idgd_catalog.rs)`), which provides `entries[].id_gd` and `bitmap_file`.
 
 ## CLI design
 
-Add a new subcommand (name bikeshed: `bench-query`) to `[src/cli.rs](./src\cli.rs)`:
+Add a new subcommand (name bikeshed: `bench-query`) to `[src/cli.rs](./src/cli.rs)`:
 
 - `--index-dir <PATH>`
 - `--set <SET_OR_MERGED_FOLDER>`
@@ -42,7 +42,7 @@ Add a new subcommand (name bikeshed: `bench-query`) to `[src/cli.rs](./src\cli.r
 
 ### 1) Add a new module
 
-- Create `[src/bench_query.rs](./src\bench_query.rs)`.
+- Create `[src/bench_query.rs](./src/bench_query.rs)`.
 - Public entry function:
   - `pub fn run(index_dir: &Path, set: &str, opts: BenchOptions) -> Result<()>`
 
@@ -73,7 +73,7 @@ Inside `bench_query::run`:
 
 - For list operations, build a full object per card index:\n+  - `reference`: `catalog.decode_bit(bit)?.reference`\n+  - `stats`: from `CompactCardView` (`main_cost`, `recall_cost`, `mountain/ocean/forest_power`)\n+  - `effects_raw`: 3× main groups + echo group as `[trigger, condition, output]` idGd triplets (from `main_effect_group(g)` and `echo_effect()`)\n+  - `effects_text` (optional but included by default since you asked for “all abilities and card effects”): translate each non-zero idGd in each group using `text_by_id`, then join into human-readable lines (same grouping rules used in `query_id_gd_effect_text`)\n+\n+This keeps the list timings realistic by including:\n+- `cards.bin` record decode\n+- per-card reference decode\n+- per-card effect object construction\n+\n+Ensure the reference format matches `Catalog::decode_bit`:
 
-```166:193:./src\catalog.rs
+```166:193:./src/catalog.rs
     pub fn decode_bit(&self, bit: u32) -> Result<DecodedCard> {
         let family = self
             .families
@@ -106,8 +106,8 @@ Inside `bench_query::run`:
 
 ### 6) Wire into CLI
 
-- In `[src/lib.rs](./src\lib.rs)`, add `pub mod bench_query;`.
-- In `[src/cli.rs](./src\cli.rs)`:
+- In `[src/lib.rs](./src/lib.rs)`, add `pub mod bench_query;`.
+- In `[src/cli.rs](./src/cli.rs)`:
   - Add a `Command::BenchQuery { ... }` variant.
   - In the `match`, call `bench_query::run(...)`.
 

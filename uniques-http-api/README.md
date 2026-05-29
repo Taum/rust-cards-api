@@ -4,7 +4,7 @@ HTTP API service for querying the merged `ALL_SETS` index.
 
 ## Local development
 
-- **Config**: create `uniques-http-api/.env.local` from `uniques-http-api/.env.local.template`.
+- **Config**: copy `uniques-http-api/.env.example` to `.env` (optional shared defaults), then create `.env.local` from `.env.local.template` for local overrides.
 - **Defaults**:
   - `PORT=8234` (local dev)
   - `INDEX_PATH=../alt-indexer/full_index/ALL_SETS`
