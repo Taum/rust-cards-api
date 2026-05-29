@@ -53,22 +53,32 @@ export type CardsIter = {
 
 export type CardFaction = {
   code: string;
+  name: string;
 };
 
 export type CardSet = {
-  reference?: string;
+  reference: string;
+  name: string;
   code?: string;
+};
+
+export type CardSubType = {
+  reference: string;
+  name: Record<string, string>;
 };
 
 export type CardV2 = {
   reference: string;
+  name: Record<string, string>;
+  artist: string;
+  set: CardSet;
+  cardSubTypes: CardSubType[];
   mainCost: number;
   recallCost: number;
   forestPower: number;
   mountainPower: number;
   oceanPower: number;
   faction: CardFaction;
-  set?: CardSet;
   mainEffect: Record<string, string>;
   echoEffect: Record<string, string>;
 };

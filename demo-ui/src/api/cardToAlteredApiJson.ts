@@ -8,8 +8,10 @@ export interface AlteredApiCardJson {
   faction: { name: string };
   set: { reference: string; code: string };
   cardType: { name: string };
-  cardSubTypes: { name: string }[];
+  cardSubTypes: { reference: string; name: string }[];
   name: string;
+  artist: string;
+  artists: { name: string }[];
   mainCost: number;
   recallCost: number;
   forestPower: number;
@@ -19,15 +21,6 @@ export interface AlteredApiCardJson {
   echoEffect: string | null;
 }
 
-const FACTION_NAMES: Record<string, string> = {
-  AX: 'Axiom',
-  BR: 'Bravos',
-  LY: 'Lyra',
-  MU: 'Muna',
-  OR: 'Ordis',
-  YZ: 'Yzmir',
-};
-
 const RARITY_BY_TOKEN: Record<string, string> = {
   U: 'UNIQUE',
   R: 'RARE',
@@ -35,55 +28,36 @@ const RARITY_BY_TOKEN: Record<string, string> = {
   E: 'EXALTED',
 };
 
-function parseReference(reference: string): {
-  setReference: string;
-  factionCode: string;
-  rarityReference: string;
-} {
-  const parts = reference.split('_');
-  if (parts[0] !== 'ALT' || parts.length < 5) {
-    return { setReference: '', factionCode: '', rarityReference: 'UNIQUE' };
-  }
-
-  const setReference = parts[1] ?? '';
-  let i = 2;
-  if (parts[i] === 'B') {
-    i += 1;
-  }
-  const factionCode = parts[i] ?? '';
-
-  const rarityToken = parts.find((p) => p in RARITY_BY_TOKEN);
-  const rarityReference = rarityToken
+function rarityFromReference(reference: string): string {
+  const rarityToken = reference.split('_').find((p) => p in RARITY_BY_TOKEN);
+  return rarityToken
     ? (RARITY_BY_TOKEN[rarityToken] ?? 'UNIQUE')
     : 'UNIQUE';
-
-  return { setReference, factionCode, rarityReference };
 }
 
 export function cardToAlteredApiJson(
   card: CardV2,
   apiLocale: string,
 ): AlteredApiCardJson {
-  const parsed = parseReference(card.reference);
   const echo = localeText(card.echoEffect ?? {}, apiLocale);
 
   return {
     reference: card.reference,
     forge: { lang: toRendererLang(apiLocale) },
-    cardRarity: { reference: parsed.rarityReference },
-    faction: {
-      name:
-        FACTION_NAMES[card.faction.code] ??
-        FACTION_NAMES[parsed.factionCode] ??
-        card.faction.code,
-    },
+    cardRarity: { reference: rarityFromReference(card.reference) },
+    faction: { name: card.faction.name },
     set: {
-      reference: card.set?.reference ?? parsed.setReference,
-      code: card.set?.code ?? '',
+      reference: card.set.reference,
+      code: card.set.code ?? '',
     },
     cardType: { name: 'Character' },
-    cardSubTypes: [],
-    name: card.reference,
+    cardSubTypes: card.cardSubTypes.map((subType) => ({
+      reference: subType.reference,
+      name: localeText(subType.name, apiLocale),
+    })),
+    name: localeText(card.name, apiLocale),
+    artist: card.artist,
+    artists: [{ name: card.artist }],
     mainCost: card.mainCost,
     recallCost: card.recallCost,
     forestPower: card.forestPower,
