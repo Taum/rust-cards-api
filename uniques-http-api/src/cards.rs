@@ -13,6 +13,7 @@ use alt_indexer::faction_index::Faction;
 use alt_indexer::idgd_catalog::IdGdCatalogEntry;
 use alt_indexer::stat_index::StatField;
 
+use crate::loader::{SetBitmaps, SET_CORE, SET_COREKS};
 use crate::AppState;
 
 #[derive(Debug, Serialize)]
@@ -155,6 +156,7 @@ struct CardsRequest {
     cursor: Option<u32>,
     filters: AbilityFilters,
     factions: Vec<Faction>,
+    sets: Vec<String>,
     main_cost: Option<CostPredicate>,
     recall_cost: Option<CostPredicate>,
     debug_bga_trigram: bool,
@@ -234,6 +236,12 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
     filters.support_o = parse_id_list(params, "support[o]")?;
 
     let factions = parse_factions(params)?;
+    let sets = parse_sets(params)?;
+    for code in &sets {
+        if !state.set_bitmaps().by_set.contains_key(code) {
+            return Err(bad_request(format!("invalid set value '{code}'")));
+        }
+    }
     let main_cost = parse_cost_predicate(params, "mainCost")?;
     let recall_cost = parse_cost_predicate(params, "recallCost")?;
     let debug_bga_trigram = params.contains_key("debug_bga_trigram");
@@ -245,6 +253,7 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
         cursor,
         filters,
         factions,
+        sets,
         main_cost,
         recall_cost,
         debug_bga_trigram,
@@ -390,6 +399,72 @@ fn parse_factions(params: &QueryMultiMap) -> ApiResult<Vec<Faction>> {
         }
     }
     Ok(out)
+}
+
+fn parse_sets(params: &QueryMultiMap) -> ApiResult<Vec<String>> {
+    // Spec: set[] repeated keys
+    // Convenience: set=CORE,COREKS
+    let mut codes: Vec<String> = Vec::new();
+    if let Some(values) = params.get("set[]") {
+        for v in values {
+            for part in v.split(',') {
+                let s = part.trim();
+                if !s.is_empty() {
+                    codes.push(s.to_string());
+                }
+            }
+        }
+    }
+    if let Some(values) = params.get("set") {
+        for v in values {
+            for part in v.split(',') {
+                let s = part.trim();
+                if !s.is_empty() {
+                    codes.push(s.to_string());
+                }
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    for code in codes {
+        if !out.contains(&code) {
+            out.push(code);
+        }
+    }
+    Ok(out)
+}
+
+fn union_requested_sets(bitmaps: &SetBitmaps, sets: &[String]) -> RoaringBitmap {
+    let has_core = sets.iter().any(|s| s == SET_CORE);
+    let has_coreks = sets.iter().any(|s| s == SET_COREKS);
+    let use_combined = has_core && has_coreks;
+
+    let mut out = RoaringBitmap::new();
+
+    if use_combined {
+        if let Some(combined) = &bitmaps.core_and_coreks {
+            out = combined.clone();
+        } else {
+            if let Some(b) = bitmaps.by_set.get(SET_CORE) {
+                out |= b.clone();
+            }
+            if let Some(b) = bitmaps.by_set.get(SET_COREKS) {
+                out |= b.clone();
+            }
+        }
+    }
+
+    for code in sets {
+        if use_combined && (code == SET_CORE || code == SET_COREKS) {
+            continue;
+        }
+        if let Some(b) = bitmaps.by_set.get(code) {
+            out |= b.clone();
+        }
+    }
+
+    out
 }
 
 fn parse_cost_u8(field: &str, s: &str) -> ApiResult<u8> {
@@ -578,6 +653,10 @@ fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap
             }
         }
         groups.push(bmp);
+    }
+
+    if !req.sets.is_empty() {
+        groups.push(union_requested_sets(state.set_bitmaps(), &req.sets));
     }
 
     if let Some(pred) = &req.main_cost {
@@ -968,14 +1047,16 @@ fn bad_request(msg: String) -> (StatusCode, Json<ApiError>) {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
+    use axum::body::Bytes;
     use alt_indexer::catalog::{Catalog, FamilyCardSubType, FamilyEntry, FamilySet, FACTION_ORDER};
     use alt_indexer::compact::{encode_record, CompactCardFields, RECORD_SIZE};
     use alt_indexer::faction_index::Faction;
     use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
     use alt_indexer::stat_index::StatField;
 
-    use crate::loader::{FactionsSummary, IndexManifest, StatsSummary};
+    use crate::loader::{build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS};
     use crate::state::AppStateInner;
 
     fn test_state() -> AppState {
@@ -1119,6 +1200,7 @@ mod tests {
 
         let effects_list = crate::effects::build_effects_list(&idgd_catalog);
         let effects_body = Arc::new(crate::effects::serialize_effects_list(&effects_list).unwrap());
+        let set_bitmaps = build_set_bitmaps(&catalog);
 
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
@@ -1151,6 +1233,96 @@ mod tests {
                 factions.insert(Faction::Br, RoaringBitmap::from_iter([7]));
                 factions
             },
+            set_bitmaps,
+        };
+
+        AppState::new(Arc::new(inner))
+    }
+
+    fn family_entry(
+        start_bit: u32,
+        source_set: &str,
+        family_number: &str,
+    ) -> FamilyEntry {
+        FamilyEntry {
+            start_bit,
+            faction: "AX".to_string(),
+            family_number: family_number.to_string(),
+            family_id: format!("AX_{family_number}"),
+            source_set: Some(source_set.to_string()),
+            max_unique_id: 5,
+            card_count: 5,
+            first_reference: format!("ALT_{source_set}_B_AX_{family_number}_U_1"),
+            name: BTreeMap::from([("en_US".to_string(), "Test".to_string())]),
+            artist: "Test".to_string(),
+            card_sub_types: vec![],
+            set: FamilySet {
+                reference: source_set.to_string(),
+                name: source_set.to_string(),
+                code: None,
+            },
+        }
+    }
+
+    fn test_state_with_sets() -> AppState {
+        let catalog = Catalog {
+            set: "ALL_SETS".to_string(),
+            faction_order: FACTION_ORDER.iter().map(|s| s.to_string()).collect(),
+            families: vec![
+                family_entry(0, SET_CORE, "01"),
+                family_entry(5, SET_COREKS, "01"),
+                family_entry(10, "ALIZE", "01"),
+            ],
+            total_bit_span: 15,
+        };
+
+        let manifest = IndexManifest {
+            version: 1,
+            set: "ALL_SETS".to_string(),
+            kind: Some("merge".to_string()),
+            built_at_secs: 0,
+            card_count: 15,
+            id_gd_count: 0,
+            total_bit_span: 15,
+            family_count: 3,
+        };
+
+        let set_bitmaps = build_set_bitmaps(&catalog);
+        assert!(set_bitmaps.by_set.contains_key(SET_CORE));
+        assert!(set_bitmaps.by_set.contains_key(SET_COREKS));
+        assert!(set_bitmaps.by_set.contains_key("ALIZE"));
+        assert!(set_bitmaps.core_and_coreks.is_some());
+
+        let inner = AppStateInner {
+            index_dir: "C:\\tmp\\index".into(),
+            catalog,
+            manifest,
+            idgd_catalog: IdGdCatalog {
+                set: "ALL_SETS".to_string(),
+                entries: vec![],
+            },
+            effects_body: Arc::new(Bytes::from_static(b"{}")),
+            stats_summary: StatsSummary {
+                version: 1,
+                set: "ALL_SETS".to_string(),
+                total_cards_indexed: 15,
+                fields: vec![],
+            },
+            factions_summary: FactionsSummary {
+                version: 1,
+                set: "ALL_SETS".to_string(),
+                total_cards_indexed: 15,
+                source: "test".to_string(),
+                factions: vec![],
+                unknown_count: 0,
+                bitmap_dir: "factions".to_string(),
+            },
+            cards: vec![0u8; 15 * RECORD_SIZE],
+            id_gd_whole: BTreeMap::new(),
+            id_gd_per_line: BTreeMap::new(),
+            stats: BTreeMap::new(),
+            factions: BTreeMap::new(),
+            set_bitmaps,
         };
 
         AppState::new(Arc::new(inner))
@@ -1274,6 +1446,79 @@ mod tests {
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         let err = parse_request(&state, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn parses_sets_from_repeated_or_csv_alias() {
+        let state = test_state_with_sets();
+
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("set[]".to_string(), vec!["CORE".to_string(), "COREKS".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        assert_eq!(req.sets.len(), 2);
+        assert!(req.sets.contains(&SET_CORE.to_string()));
+        assert!(req.sets.contains(&SET_COREKS.to_string()));
+
+        let mut params2: QueryMultiMap = HashMap::new();
+        params2.insert("set".to_string(), vec!["CORE,COREKS".to_string()]);
+        let req2 = parse_request(&state, &params2).unwrap();
+        assert_eq!(req2.sets.len(), 2);
+    }
+
+    #[test]
+    fn invalid_set_rejected() {
+        let state = test_state_with_sets();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("set[]".to_string(), vec!["NOPE".to_string()]);
+        let err = parse_request(&state, &params).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn set_filter_uses_combined_core_coreks_bitmap() {
+        let state = test_state_with_sets();
+        let bitmaps = state.set_bitmaps();
+
+        let manual = bitmaps.by_set[SET_CORE].clone() | bitmaps.by_set[SET_COREKS].clone();
+        let combined = bitmaps.core_and_coreks.as_ref().unwrap();
+        assert_eq!(manual, *combined);
+
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("set[]".to_string(), vec!["CORE".to_string(), "COREKS".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp, *combined);
+        assert_eq!(bmp.len(), 10);
+
+        let mut single: QueryMultiMap = HashMap::new();
+        single.insert("set[]".to_string(), vec!["CORE".to_string()]);
+        let req_single = parse_request(&state, &single).unwrap();
+        let bmp_single = build_bitmap(&state, &req_single).unwrap();
+        assert_eq!(bmp_single.len(), 5);
+        assert!(bmp_single.contains(0));
+        assert!(!bmp_single.contains(5));
+
+        let mut three: QueryMultiMap = HashMap::new();
+        three.insert(
+            "set[]".to_string(),
+            vec!["CORE".to_string(), "COREKS".to_string(), "ALIZE".to_string()],
+        );
+        let req_three = parse_request(&state, &three).unwrap();
+        let bmp_three = build_bitmap(&state, &req_three).unwrap();
+        assert_eq!(bmp_three.len(), 15);
+    }
+
+    #[test]
+    fn set_only_query_without_other_filters() {
+        let state = test_state_with_sets();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("set[]".to_string(), vec!["ALIZE".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), 5);
+        for i in 10..15 {
+            assert!(bmp.contains(i));
+        }
     }
 
     #[test]

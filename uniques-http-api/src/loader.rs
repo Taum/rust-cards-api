@@ -63,6 +63,42 @@ pub struct FactionSummary {
     pub bitmap_file: String,
 }
 
+pub const SET_CORE: &str = "CORE";
+pub const SET_COREKS: &str = "COREKS";
+
+#[derive(Debug, Clone)]
+pub struct SetBitmaps {
+    pub by_set: BTreeMap<String, RoaringBitmap>,
+    /// `CORE | COREKS` when both sets exist in `by_set`; built once at load.
+    pub core_and_coreks: Option<RoaringBitmap>,
+}
+
+pub fn build_set_bitmaps(catalog: &Catalog) -> SetBitmaps {
+    let mut by_set: BTreeMap<String, RoaringBitmap> = BTreeMap::new();
+    for family in &catalog.families {
+        let code = family
+            .source_set
+            .as_deref()
+            .unwrap_or(&catalog.set)
+            .to_string();
+        let end = family.start_bit.saturating_add(family.max_unique_id);
+        by_set
+            .entry(code)
+            .or_insert_with(RoaringBitmap::new)
+            .insert_range(family.start_bit..end);
+    }
+
+    let core_and_coreks = match (by_set.get(SET_CORE), by_set.get(SET_COREKS)) {
+        (Some(a), Some(b)) => Some(a.clone() | b.clone()),
+        _ => None,
+    };
+
+    SetBitmaps {
+        by_set,
+        core_and_coreks,
+    }
+}
+
 /// Eagerly load the full merged index directory into memory.
 pub fn load_index(index_dir: &Path) -> Result<AppState> {
     let index_dir = index_dir
@@ -108,6 +144,17 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
     let factions = load_factions(&index_dir, &factions_summary)?;
     eprintln!("  faction bitmaps: {}", factions.len());
 
+    let set_bitmaps = build_set_bitmaps(&catalog);
+    eprintln!(
+        "  set bitmaps: {} sets{}",
+        set_bitmaps.by_set.len(),
+        if set_bitmaps.core_and_coreks.is_some() {
+            ", CORE+COREKS combined"
+        } else {
+            ""
+        }
+    );
+
     let effects_list = build_effects_list(&idgd_catalog);
     let effects_body = Arc::new(serialize_effects_list(&effects_list)?);
     eprintln!(
@@ -132,6 +179,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         id_gd_per_line,
         stats,
         factions,
+        set_bitmaps,
         effects_body,
     })))
 }

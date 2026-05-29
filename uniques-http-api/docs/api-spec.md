@@ -6,7 +6,7 @@
 
 | Supported | Parameter | Type / Encoding | Example | Meaning |
 |---|---|---|---|---|
-| No  | `set[]` | repeated array | `set[]=CORE` | Filter by one or more set references. |
+| Yes | `set[]` | repeated array | `set[]=CORE` | Filter by one or more source set codes (e.g. `CORE`, `COREKS`). Alias: `set=CORE,COREKS` (CSV). OR within listed sets; AND with other filters. |
 | Yes | `faction[]` | repeated array | `faction[]=AX` | Filter by one or more faction codes. |
 
 ### Numeric and stat filters

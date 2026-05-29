@@ -27,6 +27,7 @@ export type FilterState = {
   effectMode: EffectMode;
   support: EffectSlot;
   factions: string[];
+  sets: string[];
   handCost: string;
   reserveCost: string;
   limit: string;
@@ -37,11 +38,25 @@ export const FACTIONS = ['AX', 'BR', 'LY', 'MU', 'OR', 'YZ'] as const;
 
 export type FactionCode = (typeof FACTIONS)[number];
 
+/** Source set codes for merged ALL_SETS index (merge `--sets` order). */
+export const SOURCE_SETS = [
+  'COREKS',
+  'CORE',
+  'ALIZE',
+  'BISE',
+  'CYCLONE',
+  'DUSTER',
+  'EOLE',
+] as const;
+
+export type SourceSetCode = (typeof SOURCE_SETS)[number];
+
 export const DEFAULT_FILTER_STATE: FilterState = {
   effects: [{ t: '', c: '', o: '' }],
   effectMode: 'and',
   support: { t: '', c: '', o: '' },
   factions: [],
+  sets: [],
   handCost: '',
   reserveCost: '',
   limit: '',

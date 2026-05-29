@@ -86,6 +86,10 @@ export function buildQuery(
     params.append('faction[]', faction);
   }
 
+  for (const set of state.sets) {
+    params.append('set[]', set);
+  }
+
   if (state.handCost.trim()) {
     const parsed = parseCostInput(state.handCost);
     if (!parsed.ok) {

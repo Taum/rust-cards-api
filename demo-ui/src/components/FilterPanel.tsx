@@ -2,6 +2,7 @@ import { activeEffectSlotCount } from '../api/buildQuery';
 import type { CardLocale } from '../locale';
 import {
   FACTIONS,
+  SOURCE_SETS,
   type EffectMode,
   type EffectsCatalogResponse,
   type EffectsCatalogStatus,
@@ -63,6 +64,13 @@ export function FilterPanel({
       ? filters.factions.filter((f) => f !== code)
       : [...filters.factions, code];
     setFilters({ factions: next });
+  };
+
+  const toggleSet = (code: string) => {
+    const next = filters.sets.includes(code)
+      ? filters.sets.filter((s) => s !== code)
+      : [...filters.sets, code];
+    setFilters({ sets: next });
   };
 
   const multipleEffects = activeEffectSlotCount(filters) >= 2;
@@ -177,6 +185,26 @@ export function FilterPanel({
                 type="checkbox"
                 checked={filters.factions.includes(code)}
                 onChange={() => toggleFaction(code)}
+                className="rounded border-slate-600 bg-slate-950 text-sky-500 focus:ring-sky-500"
+              />
+              {code}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-medium text-slate-300">Sets</h3>
+        <div className="flex flex-wrap gap-3">
+          {SOURCE_SETS.map((code) => (
+            <label
+              key={code}
+              className="flex cursor-pointer items-center gap-1.5 text-sm text-slate-200"
+            >
+              <input
+                type="checkbox"
+                checked={filters.sets.includes(code)}
+                onChange={() => toggleSet(code)}
                 className="rounded border-slate-600 bg-slate-950 text-sky-500 focus:ring-sky-500"
               />
               {code}

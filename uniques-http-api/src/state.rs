@@ -11,7 +11,7 @@ use alt_indexer::idgd_catalog::IdGdCatalog;
 use alt_indexer::stat_index::StatField;
 use roaring::RoaringBitmap;
 
-use crate::loader::{FactionsSummary, IndexManifest, StatsSummary};
+use crate::loader::{FactionsSummary, IndexManifest, SetBitmaps, StatsSummary};
 
 /// Shared read-only index data, loaded once at startup and cloned per request via `Arc`.
 #[derive(Clone)]
@@ -34,6 +34,7 @@ pub struct AppStateInner {
     /// Stat bucket bitmaps keyed by field and value 0..15.
     pub stats: BTreeMap<StatField, [RoaringBitmap; 16]>,
     pub factions: BTreeMap<Faction, RoaringBitmap>,
+    pub set_bitmaps: SetBitmaps,
     /// Pre-serialized `GET /api/v2/effects` JSON body.
     pub effects_body: Arc<Bytes>,
 }
@@ -85,6 +86,10 @@ impl AppState {
 
     pub fn factions(&self) -> &BTreeMap<Faction, RoaringBitmap> {
         &self.inner.factions
+    }
+
+    pub fn set_bitmaps(&self) -> &SetBitmaps {
+        &self.inner.set_bitmaps
     }
 
     pub fn effects_body(&self) -> &Arc<Bytes> {
