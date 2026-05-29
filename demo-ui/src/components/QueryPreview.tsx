@@ -14,24 +14,16 @@ function decodeQueryText(encoded: string): string {
   }
 }
 
-function formatUrlForDisplay(url: string): string {
-  const qIndex = url.indexOf("?");
-  if (qIndex === -1) {
-    return url;
-  }
-  const path = url.slice(0, qIndex);
-  const query = url.slice(qIndex + 1);
-  return `${path}?${decodeQueryText(query)}`;
+function buildDisplayPath(queryString: string | null): string {
+  return queryString
+    ? `/api/v2/cards?${decodeQueryText(queryString)}`
+    : "/api/v2/cards";
 }
 
 export function QueryPreview({ queryString, url }: QueryPreviewProps) {
   const [copied, setCopied] = useState(false);
 
-  const displayUrl = url
-    ? formatUrlForDisplay(url)
-    : queryString
-      ? `/api/v2/cards?${decodeQueryText(queryString)}`
-      : "/api/v2/cards";
+  const displayPath = buildDisplayPath(queryString);
 
   const copyUrl = async () => {
     if (!url) {
@@ -53,7 +45,7 @@ export function QueryPreview({ queryString, url }: QueryPreviewProps) {
           <h2 className="text-xs font-semibold text-slate-200">
             Query preview:
           </h2>
-          <pre className="font-mono text-xs text-sky-300/90">{displayUrl}</pre>
+          <pre className="font-mono text-xs text-sky-300/90">{displayPath}</pre>
         </div>
         <button
           type="button"
