@@ -1,5 +1,6 @@
+import { activeEffectSlotCount } from '../api/buildQuery';
 import { EffectSlotFields } from './EffectSlotFields';
-import { FACTIONS, type FilterState } from '../types';
+import { FACTIONS, type EffectMode, type FilterState } from '../types';
 
 type FilterPanelProps = {
   filters: FilterState;
@@ -48,6 +49,12 @@ export function FilterPanel({
     setFilters({ factions: next });
   };
 
+  const multipleEffects = activeEffectSlotCount(filters) >= 2;
+
+  const setEffectMode = (effectMode: EffectMode) => {
+    setFilters({ effectMode });
+  };
+
   return (
     <aside className="space-y-5">
       <div className="flex items-center justify-between">
@@ -62,7 +69,41 @@ export function FilterPanel({
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-medium text-slate-300">Effects</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-slate-300">Effects</h3>
+          {multipleEffects && (
+            <div
+              className="flex rounded border border-slate-600 text-sm"
+              role="group"
+              aria-label="Effect combine mode"
+            >
+              <button
+                type="button"
+                onClick={() => setEffectMode('and')}
+                className={`px-3 py-1 font-medium ${
+                  filters.effectMode === 'and'
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800'
+                }`}
+                aria-pressed={filters.effectMode === 'and'}
+              >
+                AND
+              </button>
+              <button
+                type="button"
+                onClick={() => setEffectMode('or')}
+                className={`border-l border-slate-600 px-3 py-1 font-medium ${
+                  filters.effectMode === 'or'
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800'
+                }`}
+                aria-pressed={filters.effectMode === 'or'}
+              >
+                OR
+              </button>
+            </div>
+          )}
+        </div>
         {filters.effects.map((slot, index) => (
           <EffectSlotFields
             key={index}
@@ -80,12 +121,6 @@ export function FilterPanel({
         >
           Add effect slot
         </button>
-        {filters.effects.length > 1 && (
-          <p className="text-xs text-amber-400/90">
-            API multi-slot support pending — queries with effect[1]+ may return
-            400 until the backend is updated.
-          </p>
-        )}
       </section>
 
       <section className="space-y-2">

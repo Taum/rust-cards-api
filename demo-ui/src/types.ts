@@ -4,8 +4,11 @@ export type EffectSlot = {
   o: string;
 };
 
+export type EffectMode = 'and' | 'or';
+
 export type FilterState = {
   effects: EffectSlot[];
+  effectMode: EffectMode;
   support: EffectSlot;
   factions: string[];
   handCost: string;
@@ -20,6 +23,7 @@ export type FactionCode = (typeof FACTIONS)[number];
 
 export const DEFAULT_FILTER_STATE: FilterState = {
   effects: [{ t: '', c: '', o: '' }],
+  effectMode: 'and',
   support: { t: '', c: '', o: '' },
   factions: [],
   handCost: '',
@@ -37,6 +41,11 @@ export type CardFaction = {
   code: string;
 };
 
+export type CardSet = {
+  reference?: string;
+  code?: string;
+};
+
 export type CardV2 = {
   reference: string;
   mainCost: number;
@@ -45,6 +54,7 @@ export type CardV2 = {
   mountainPower: number;
   oceanPower: number;
   faction: CardFaction;
+  set?: CardSet;
   mainEffect: Record<string, string>;
   echoEffect: Record<string, string>;
 };

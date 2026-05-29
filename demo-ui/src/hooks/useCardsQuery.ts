@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  buildFullUrl,
-  hasActivePredicate,
-} from '../api/buildQuery';
+import { buildFullUrl } from '../api/buildQuery';
 import type { ApiError, CardsResponse, FilterState } from '../types';
 
 const DEBOUNCE_MS = 300;
@@ -61,18 +58,6 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
           handCostError: parsed.handCostError ?? null,
           reserveCostError: parsed.reserveCostError ?? null,
           url: null,
-          queryString: null,
-          skipped: true,
-        });
-        return;
-      }
-
-      if (!hasActivePredicate(filters)) {
-        abortRef.current?.abort();
-        setQueryState({
-          ...initialState,
-          status: 'idle',
-          url: '/api/v2/cards',
           queryString: null,
           skipped: true,
         });

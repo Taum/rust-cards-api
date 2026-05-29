@@ -5,6 +5,10 @@ function slotHasValues(slot: EffectSlot): boolean {
   return slot.t.trim() !== '' || slot.c.trim() !== '' || slot.o.trim() !== '';
 }
 
+export function activeEffectSlotCount(state: FilterState): number {
+  return state.effects.filter(slotHasValues).length;
+}
+
 function appendCostParams(
   params: URLSearchParams,
   key: string,
@@ -35,36 +39,6 @@ function appendEffectField(
   params.set(`effect[${slotIndex}][${field}]`, value);
 }
 
-export function hasActivePredicate(state: FilterState): boolean {
-  if (state.factions.length > 0) {
-    return true;
-  }
-
-  if (state.effects.some(slotHasValues)) {
-    return true;
-  }
-
-  if (slotHasValues(state.support)) {
-    return true;
-  }
-
-  if (state.handCost.trim()) {
-    const parsed = parseCostInput(state.handCost);
-    if (parsed.ok && parsed.values.length > 0) {
-      return true;
-    }
-  }
-
-  if (state.reserveCost.trim()) {
-    const parsed = parseCostInput(state.reserveCost);
-    if (parsed.ok && parsed.values.length > 0) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export function buildQuery(state: FilterState): BuildQueryResult {
   const params = new URLSearchParams();
 
@@ -79,6 +53,10 @@ export function buildQuery(state: FilterState): BuildQueryResult {
     appendEffectField(params, index, 'c', slot.c);
     appendEffectField(params, index, 'o', slot.o);
   });
+
+  if (activeEffectSlotCount(state) >= 2 && state.effectMode === 'or') {
+    params.set('effectMode', 'or');
+  }
 
   if (slotHasValues(state.support)) {
     const supportFields: Array<['t' | 'c' | 'o', string]> = [
@@ -118,11 +96,6 @@ export function buildQuery(state: FilterState): BuildQueryResult {
 
   if (handCostError || reserveCostError) {
     return { ok: false, handCostError, reserveCostError };
-  }
-
-  // Pagination is only meaningful once at least one filter predicate is set.
-  if (!hasActivePredicate(state)) {
-    return { ok: true, params };
   }
 
   const limitRaw = state.limit.trim();
