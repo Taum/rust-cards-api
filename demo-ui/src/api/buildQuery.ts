@@ -1,0 +1,182 @@
+import { parseCostInput } from './parseCostInput';
+import type { BuildQueryResult, EffectSlot, FilterState } from '../types';
+
+function slotHasValues(slot: EffectSlot): boolean {
+  return slot.t.trim() !== '' || slot.c.trim() !== '' || slot.o.trim() !== '';
+}
+
+function appendCostParams(
+  params: URLSearchParams,
+  key: string,
+  values: number[],
+): void {
+  if (values.length === 0) {
+    return;
+  }
+  if (values.length === 1) {
+    params.set(key, String(values[0]));
+    return;
+  }
+  for (const value of values) {
+    params.append(`${key}[]`, String(value));
+  }
+}
+
+function appendEffectField(
+  params: URLSearchParams,
+  slotIndex: number,
+  field: 't' | 'c' | 'o',
+  raw: string,
+): void {
+  const value = raw.trim();
+  if (!value) {
+    return;
+  }
+  params.set(`effect[${slotIndex}][${field}]`, value);
+}
+
+export function hasActivePredicate(state: FilterState): boolean {
+  if (state.factions.length > 0) {
+    return true;
+  }
+
+  if (state.effects.some(slotHasValues)) {
+    return true;
+  }
+
+  if (slotHasValues(state.support)) {
+    return true;
+  }
+
+  if (state.handCost.trim()) {
+    const parsed = parseCostInput(state.handCost);
+    if (parsed.ok && parsed.values.length > 0) {
+      return true;
+    }
+  }
+
+  if (state.reserveCost.trim()) {
+    const parsed = parseCostInput(state.reserveCost);
+    if (parsed.ok && parsed.values.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function buildQuery(state: FilterState): BuildQueryResult {
+  const params = new URLSearchParams();
+
+  let handCostError: string | undefined;
+  let reserveCostError: string | undefined;
+
+  state.effects.forEach((slot, index) => {
+    if (!slotHasValues(slot)) {
+      return;
+    }
+    appendEffectField(params, index, 't', slot.t);
+    appendEffectField(params, index, 'c', slot.c);
+    appendEffectField(params, index, 'o', slot.o);
+  });
+
+  if (slotHasValues(state.support)) {
+    const supportFields: Array<['t' | 'c' | 'o', string]> = [
+      ['t', state.support.t],
+      ['c', state.support.c],
+      ['o', state.support.o],
+    ];
+    for (const [field, raw] of supportFields) {
+      const value = raw.trim();
+      if (value) {
+        params.set(`support[${field}]`, value);
+      }
+    }
+  }
+
+  for (const faction of state.factions) {
+    params.append('faction[]', faction);
+  }
+
+  if (state.handCost.trim()) {
+    const parsed = parseCostInput(state.handCost);
+    if (!parsed.ok) {
+      handCostError = parsed.error;
+    } else {
+      appendCostParams(params, 'mainCost', parsed.values);
+    }
+  }
+
+  if (state.reserveCost.trim()) {
+    const parsed = parseCostInput(state.reserveCost);
+    if (!parsed.ok) {
+      reserveCostError = parsed.error;
+    } else {
+      appendCostParams(params, 'recallCost', parsed.values);
+    }
+  }
+
+  if (handCostError || reserveCostError) {
+    return { ok: false, handCostError, reserveCostError };
+  }
+
+  // Pagination is only meaningful once at least one filter predicate is set.
+  if (!hasActivePredicate(state)) {
+    return { ok: true, params };
+  }
+
+  const limitRaw = state.limit.trim();
+  const limitParsed =
+    limitRaw === '' ? 50 : Number.parseInt(limitRaw, 10);
+  const limit = Math.min(
+    200,
+    Math.max(1, Number.isNaN(limitParsed) ? 50 : limitParsed),
+  );
+  params.set('limit', String(limit));
+
+  const cursor = state.cursor.trim();
+  if (cursor) {
+    params.set('cursor', cursor);
+  }
+
+  return { ok: true, params };
+}
+
+export function buildQueryString(state: FilterState): BuildQueryResult {
+  return buildQuery(state);
+}
+
+export function buildRequestPath(state: FilterState): BuildQueryResult & {
+  path?: string;
+  queryString?: string;
+} {
+  const result = buildQuery(state);
+  if (!result.ok) {
+    return result;
+  }
+  const qs = result.params.toString();
+  return {
+    ok: true,
+    params: result.params,
+    queryString: qs,
+    path: qs ? `/api/v2/cards?${qs}` : '/api/v2/cards',
+  };
+}
+
+export function getApiBaseUrl(): string {
+  const base = import.meta.env.VITE_API_BASE_URL?.trim() ?? '';
+  return base.replace(/\/$/, '');
+}
+
+export function buildFullUrl(state: FilterState): BuildQueryResult & {
+  url?: string;
+  queryString?: string;
+} {
+  const result = buildRequestPath(state);
+  if (!result.ok || !result.path) {
+    return result;
+  }
+  const apiBase = getApiBaseUrl();
+  const url = apiBase ? `${apiBase}${result.path}` : result.path;
+  return { ...result, url };
+}
