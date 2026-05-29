@@ -30,7 +30,6 @@ export type FilterState = {
   handCost: string;
   reserveCost: string;
   limit: string;
-  cursor: string;
 };
 
 export const FACTIONS = ['AX', 'BR', 'LY', 'MU', 'OR', 'YZ'] as const;
@@ -45,7 +44,6 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   handCost: '',
   reserveCost: '',
   limit: '',
-  cursor: '',
 };
 
 export type CardsIter = {

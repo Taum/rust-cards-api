@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react';
 import type { CardsQueryState } from '../hooks/useCardsQuery';
 import type { CardLocale } from '../locale';
 
 import { CardList } from './CardList';
+import { LoadingSpinner } from './LoadingSpinner';
 
 type ResultsPanelProps = {
   query: CardsQueryState;
@@ -9,44 +11,94 @@ type ResultsPanelProps = {
 };
 
 export function ResultsPanel({ query, locale }: ResultsPanelProps) {
-  const { status, data, error, durationMs, skipped } = query;
-  const cardCount = data?.cards.length ?? 0;
-  const total = data?.iter.total;
+  const {
+    status,
+    cards,
+    iter,
+    error,
+    durationMs,
+    skipped,
+    loadingMore,
+    lastPageCount,
+    hasMore,
+    loadMore,
+  } = query;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const displayed = cards.length;
+  const cursor = iter?.cursor;
+  const inFlight = status === 'loading' || loadingMore;
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          loadMore();
+        }
+      },
+      { root, rootMargin: '200px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore, hasMore, status, loadingMore, displayed]);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
-        {status === 'loading' && (
-          <span className="text-sky-300">Loading…</span>
-        )}
-        {status === 'error' && error && (
-          <span className="text-red-400">Error: {error}</span>
-        )}
-        {status === 'success' && durationMs !== null && (
-          <span className="text-emerald-300">
-            {durationMs.toFixed(1)} ms
-            {total !== undefined && (
-              <>
-                {' '}
-                · <strong>{total.toLocaleString()}</strong> total matches ·{' '}
-                {cardCount} card{cardCount === 1 ? '' : 's'} returned
-              </>
-            )}
-          </span>
-        )}
-        {status === 'idle' && skipped && (
-          <span className="text-slate-500">
-            Fix filter validation errors to run a query.
-          </span>
-        )}
-        {status === 'idle' && !skipped && (
-          <span className="text-slate-500">Waiting…</span>
-        )}
+      <div className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm">
+        {inFlight && <LoadingSpinner />}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+          {status === 'loading' && (
+            <span className="text-sky-300">Loading…</span>
+          )}
+          {status === 'success' && iter !== null && (
+            <span className="text-emerald-300">
+              <strong>{displayed.toLocaleString()}</strong> displayed ·{' '}
+              <strong>{lastPageCount.toLocaleString()}</strong> returned ·{' '}
+              {cursor !== undefined ? (
+                <>
+                  cursor <strong>{cursor.toLocaleString()}</strong>
+                </>
+              ) : (
+                <>end of results</>
+              )}
+              {' '}
+              · <strong>{iter.total.toLocaleString()}</strong> total matches
+              {durationMs !== null && <> · {durationMs.toFixed(1)} ms</>}
+            </span>
+          )}
+          {status === 'error' && error && (
+            <span className="text-red-400">Error: {error}</span>
+          )}
+          {status === 'success' && error && (
+            <span className="text-red-400">Error: {error}</span>
+          )}
+          {status === 'idle' && skipped && (
+            <span className="text-slate-500">
+              Fix filter validation errors to run a query.
+            </span>
+          )}
+          {status === 'idle' && !skipped && (
+            <span className="text-slate-500">Waiting…</span>
+          )}
+        </div>
       </div>
 
-      {status === 'success' && data && (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2">
-          <CardList cards={data.cards} locale={locale} />
+      {(status === 'success' || (status === 'error' && displayed > 0)) && (
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2"
+        >
+          <CardList cards={cards} locale={locale} />
+          {hasMore && <div ref={sentinelRef} className="h-1" aria-hidden />}
         </div>
       )}
     </section>

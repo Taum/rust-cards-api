@@ -11,7 +11,7 @@ type CardListProps = {
 export function CardList({ cards, locale }: CardListProps) {
   if (cards.length === 0) {
     return (
-      <p className="text-sm text-slate-500">No cards in this page.</p>
+      <p className="text-sm text-slate-500">No cards match these filters.</p>
     );
   }
 

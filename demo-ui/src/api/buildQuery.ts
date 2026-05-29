@@ -39,7 +39,14 @@ function appendEffectField(
   params.set(`effect[${slotIndex}][${field}]`, value);
 }
 
-export function buildQuery(state: FilterState): BuildQueryResult {
+export type BuildQueryOptions = {
+  cursor?: number;
+};
+
+export function buildQuery(
+  state: FilterState,
+  options?: BuildQueryOptions,
+): BuildQueryResult {
   const params = new URLSearchParams();
 
   let handCostError: string | undefined;
@@ -110,23 +117,28 @@ export function buildQuery(state: FilterState): BuildQueryResult {
   );
   params.set('limit', String(limit));
 
-  const cursor = state.cursor.trim();
-  if (cursor) {
-    params.set('cursor', cursor);
+  if (options?.cursor !== undefined) {
+    params.set('cursor', String(options.cursor));
   }
 
   return { ok: true, params };
 }
 
-export function buildQueryString(state: FilterState): BuildQueryResult {
-  return buildQuery(state);
+export function buildQueryString(
+  state: FilterState,
+  options?: BuildQueryOptions,
+): BuildQueryResult {
+  return buildQuery(state, options);
 }
 
-export function buildRequestPath(state: FilterState): BuildQueryResult & {
+export function buildRequestPath(
+  state: FilterState,
+  options?: BuildQueryOptions,
+): BuildQueryResult & {
   path?: string;
   queryString?: string;
 } {
-  const result = buildQuery(state);
+  const result = buildQuery(state, options);
   if (!result.ok) {
     return result;
   }
@@ -144,11 +156,14 @@ export function getApiBaseUrl(): string {
   return base.replace(/\/$/, '');
 }
 
-export function buildFullUrl(state: FilterState): BuildQueryResult & {
+export function buildFullUrl(
+  state: FilterState,
+  options?: BuildQueryOptions,
+): BuildQueryResult & {
   url?: string;
   queryString?: string;
 } {
-  const result = buildRequestPath(state);
+  const result = buildRequestPath(state, options);
   if (!result.ok || !result.path) {
     return result;
   }

@@ -216,7 +216,7 @@ export function FilterPanel({
         </label>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section>
         <label className="block text-sm text-slate-300">
           Limit (1–200)
           <input
@@ -226,16 +226,6 @@ export function FilterPanel({
             value={filters.limit}
             onChange={(e) => setFilters({ limit: e.target.value })}
             placeholder="50"
-            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-          />
-        </label>
-        <label className="block text-sm text-slate-300">
-          Cursor
-          <input
-            type="text"
-            value={filters.cursor}
-            onChange={(e) => setFilters({ cursor: e.target.value })}
-            placeholder="optional"
             className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
           />
         </label>

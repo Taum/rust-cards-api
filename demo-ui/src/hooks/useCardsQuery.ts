@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildFullUrl } from '../api/buildQuery';
-import type { ApiError, CardsResponse, FilterState } from '../types';
+import type { ApiError, CardV2, CardsIter, FilterState } from '../types';
 
 const DEBOUNCE_MS = 300;
 
@@ -8,7 +8,8 @@ export type QueryStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export type CardsQueryState = {
   status: QueryStatus;
-  data: CardsResponse | null;
+  cards: CardV2[];
+  iter: CardsIter | null;
   error: string | null;
   durationMs: number | null;
   fetchedAt: number | null;
@@ -17,11 +18,16 @@ export type CardsQueryState = {
   handCostError: string | null;
   reserveCostError: string | null;
   skipped: boolean;
+  loadingMore: boolean;
+  lastPageCount: number;
+  hasMore: boolean;
+  loadMore: () => void;
 };
 
-const initialState: CardsQueryState = {
+const initialState: Omit<CardsQueryState, 'loadMore' | 'hasMore'> = {
   status: 'idle',
-  data: null,
+  cards: [],
+  iter: null,
   error: null,
   durationMs: null,
   fetchedAt: null,
@@ -30,17 +36,72 @@ const initialState: CardsQueryState = {
   handCostError: null,
   reserveCostError: null,
   skipped: false,
+  loadingMore: false,
+  lastPageCount: 0,
 };
 
 function serializeFilters(state: FilterState): string {
   return JSON.stringify(state);
 }
 
+async function fetchCardsPage(
+  url: string,
+  signal: AbortSignal,
+): Promise<{
+  cards: CardV2[];
+  iter: CardsIter;
+  durationMs: number;
+}> {
+  const start = performance.now();
+  const response = await fetch(url, { signal });
+  const durationMs = performance.now() - start;
+
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as ApiError;
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(message);
+  }
+
+  const data = (await response.json()) as {
+    cards: CardV2[];
+    iter: CardsIter;
+  };
+  return {
+    cards: data.cards,
+    iter: data.iter,
+    durationMs,
+  };
+}
+
 export function useCardsQuery(filters: FilterState): CardsQueryState {
-  const [queryState, setQueryState] = useState<CardsQueryState>(initialState);
+  const [queryState, setQueryState] =
+    useState<Omit<CardsQueryState, 'loadMore' | 'hasMore'>>(initialState);
   const serialized = useMemo(() => serializeFilters(filters), [filters]);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
   const abortRef = useRef<AbortController | null>(null);
+  const loadMoreAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const iterRef = useRef<CardsIter | null>(null);
+  iterRef.current = queryState.iter;
+
+  const loadingMoreRef = useRef(false);
+  loadingMoreRef.current = queryState.loadingMore;
+
+  const statusRef = useRef<QueryStatus>('idle');
+  statusRef.current = queryState.status;
+
+  const skippedRef = useRef(false);
+  skippedRef.current = queryState.skipped;
 
   useEffect(() => {
     if (debounceRef.current) {
@@ -52,6 +113,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
 
       if (!parsed.ok) {
         abortRef.current?.abort();
+        loadMoreAbortRef.current?.abort();
         setQueryState({
           ...initialState,
           status: 'idle',
@@ -65,67 +127,36 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
       }
 
       abortRef.current?.abort();
+      loadMoreAbortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       const url = parsed.url!;
       const queryString = parsed.queryString ?? '';
 
-      setQueryState((prev) => ({
-        ...prev,
+      setQueryState({
+        ...initialState,
         status: 'loading',
-        error: null,
-        handCostError: null,
-        reserveCostError: null,
         url,
         queryString,
         skipped: false,
-      }));
-
-      const start = performance.now();
+      });
 
       void (async () => {
         try {
-          const response = await fetch(url, { signal: controller.signal });
-          const durationMs = performance.now() - start;
+          const { cards, iter, durationMs } = await fetchCardsPage(
+            url,
+            controller.signal,
+          );
 
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          if (!response.ok) {
-            let message = `HTTP ${response.status}`;
-            try {
-              const body = (await response.json()) as ApiError;
-              if (body.error) {
-                message = body.error;
-              }
-            } catch {
-              // ignore JSON parse errors
-            }
-            setQueryState({
-              status: 'error',
-              data: null,
-              error: message,
-              durationMs,
-              fetchedAt: Date.now(),
-              url,
-              queryString,
-              handCostError: null,
-              reserveCostError: null,
-              skipped: false,
-            });
-            return;
-          }
-
-          const data = (await response.json()) as CardsResponse;
           if (controller.signal.aborted) {
             return;
           }
 
           setQueryState({
             status: 'success',
-            data,
+            cards,
+            iter,
             error: null,
             durationMs,
             fetchedAt: Date.now(),
@@ -134,24 +165,22 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
             handCostError: null,
             reserveCostError: null,
             skipped: false,
+            loadingMore: false,
+            lastPageCount: cards.length,
           });
         } catch (err) {
           if (controller.signal.aborted) {
             return;
           }
-          const durationMs = performance.now() - start;
           const message =
             err instanceof Error ? err.message : 'Request failed';
           setQueryState({
+            ...initialState,
             status: 'error',
-            data: null,
             error: message,
-            durationMs,
             fetchedAt: Date.now(),
             url,
             queryString,
-            handCostError: null,
-            reserveCostError: null,
             skipped: false,
           });
         }
@@ -165,11 +194,81 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
     };
   }, [serialized, filters]);
 
+  const loadMore = useCallback(() => {
+    const iter = iterRef.current;
+    if (
+      iter?.cursor === undefined ||
+      loadingMoreRef.current ||
+      statusRef.current === 'loading' ||
+      skippedRef.current
+    ) {
+      return;
+    }
+
+    const parsed = buildFullUrl(filtersRef.current, { cursor: iter.cursor });
+    if (!parsed.ok || !parsed.url) {
+      return;
+    }
+
+    loadMoreAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadMoreAbortRef.current = controller;
+
+    setQueryState((prev) => ({
+      ...prev,
+      loadingMore: true,
+      error: null,
+    }));
+
+    void (async () => {
+      try {
+        const { cards: pageCards, iter: nextIter, durationMs } =
+          await fetchCardsPage(parsed.url!, controller.signal);
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setQueryState((prev) => ({
+          ...prev,
+          status: 'success',
+          cards: [...prev.cards, ...pageCards],
+          iter: nextIter,
+          error: null,
+          durationMs,
+          fetchedAt: Date.now(),
+          loadingMore: false,
+          lastPageCount: pageCards.length,
+        }));
+      } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        const message =
+          err instanceof Error ? err.message : 'Request failed';
+        setQueryState((prev) => ({
+          ...prev,
+          status: prev.cards.length > 0 ? 'success' : 'error',
+          error: message,
+          loadingMore: false,
+          fetchedAt: Date.now(),
+        }));
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      loadMoreAbortRef.current?.abort();
     };
   }, []);
 
-  return queryState;
+  const hasMore = queryState.iter?.cursor !== undefined;
+
+  return {
+    ...queryState,
+    hasMore,
+    loadMore,
+  };
 }
