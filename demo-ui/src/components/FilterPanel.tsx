@@ -72,7 +72,7 @@ export function FilterPanel({
   };
 
   return (
-    <aside className="space-y-5">
+    <aside className="space-y-5 overflow-visible">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-100">Filters</h2>
         <button
@@ -84,7 +84,7 @@ export function FilterPanel({
         </button>
       </div>
 
-      <section className="space-y-3">
+      <section className="space-y-3 overflow-visible">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-slate-300">Effects</h3>
           {multipleEffects && (
@@ -140,6 +140,7 @@ export function FilterPanel({
             catalog={effectsCatalog}
             effectsLoading={effectsLoading}
             locale={locale}
+            region="main"
           />
         ))}
         <button
@@ -160,6 +161,7 @@ export function FilterPanel({
           catalog={effectsCatalog}
           effectsLoading={effectsLoading}
           locale={locale}
+          region="echo"
         />
       </section>
 

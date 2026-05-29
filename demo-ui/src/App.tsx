@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getApiBaseUrl } from './api/buildQuery';
 import { FilterPanel } from './components/FilterPanel';
 import { QueryPreview } from './components/QueryPreview';
 import { ResultsPanel } from './components/ResultsPanel';
@@ -14,6 +15,7 @@ export default function App() {
   const [locale, setLocale] = useState<CardLocale>(DEFAULT_CARD_LOCALE);
   const query = useCardsQuery(filters);
   const effects = useEffectsCatalog();
+  const effectsApiUrl = `${getApiBaseUrl()}/api/v2/effects`;
 
   const clearFilters = () => {
     setFilters(DEFAULT_FILTER_STATE);
@@ -23,12 +25,22 @@ export default function App() {
     <div className="min-h-screen bg-slate-950">
       <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-4">
         <div
-          className={`mx-auto flex flex-wrap items-end justify-between gap-4 ${CONTENT_WIDTH}`}
+          className={`mx-auto flex flex-wrap items-center justify-between gap-4 ${CONTENT_WIDTH}`}
         >
           <div>
             <h1 className="text-xl font-bold text-slate-50">Cards API Demo</h1>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <div className="flex flex-wrap items-center gap-4">
+            <a
+              href={effectsApiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm inline-block flex flex-col group text-slate-50 hover:text-slate-600 hover:underline"
+            >
+              <h2>Show effects Catalog</h2>
+              <code className="text-inherit text-sm text-sky-300 group-hover:text-slate-600">GET /api/v2/effects</code>
+            </a>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
             <span className="text-slate-400">Locale</span>
             <select
               value={locale}
@@ -41,7 +53,8 @@ export default function App() {
                 </option>
               ))}
             </select>
-          </label>
+            </label>
+          </div>
         </div>
       </header>
 

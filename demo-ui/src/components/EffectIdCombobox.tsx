@@ -9,8 +9,7 @@ import {
 import { localeText, type CardLocale } from '../locale';
 import type { EffectCatalogItem } from '../types';
 
-const MAX_SUGGESTIONS = 40;
-const LABEL_MAX_LEN = 72;
+const MAX_FILTERED_SUGGESTIONS = 40;
 
 type EffectIdComboboxProps = {
   label: string;
@@ -41,11 +40,16 @@ function applySelection(value: string, idGd: number): string {
   return prefix ? `${prefix}${id}` : id;
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) {
-    return text;
+function appendSelection(value: string, idGd: number): string {
+  const id = String(idGd);
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return id;
   }
-  return `${text.slice(0, max - 1)}…`;
+  if (trimmed.endsWith(',')) {
+    return `${trimmed}${id}`;
+  }
+  return `${trimmed},${id}`;
 }
 
 function matchesOption(
@@ -77,23 +81,42 @@ export function EffectIdCombobox({
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
+  /** False on focus: show full list and append on pick. True after user edits input. */
+  const [isFiltering, setIsFiltering] = useState(false);
 
   const token = activeToken(value);
 
   const suggestions = useMemo(() => {
-    const filtered = options.filter((item) => matchesOption(item, token, locale));
-    return filtered.slice(0, MAX_SUGGESTIONS);
-  }, [options, token, locale]);
+    if (!isFiltering) {
+      return options;
+    }
+    return options
+      .filter((item) => matchesOption(item, token, locale))
+      .slice(0, MAX_FILTERED_SUGGESTIONS);
+  }, [options, token, locale, isFiltering]);
 
   useEffect(() => {
     setHighlighted(0);
-  }, [token, suggestions.length]);
+  }, [token, suggestions.length, isFiltering]);
 
   const showList = open && !disabled && suggestions.length > 0;
+  const showClear = !disabled && value.trim() !== '';
+
+  const clearValue = () => {
+    onChange('');
+    setIsFiltering(false);
+    setOpen(false);
+    inputRef.current?.focus();
+  };
 
   const selectItem = (item: EffectCatalogItem) => {
-    onChange(applySelection(value, item.idGd));
-    setOpen(false);
+    if (isFiltering) {
+      onChange(applySelection(value, item.idGd));
+      setOpen(false);
+    } else {
+      onChange(appendSelection(value, item.idGd));
+      setOpen(true);
+    }
     inputRef.current?.focus();
   };
 
@@ -139,37 +162,59 @@ export function EffectIdCombobox({
   };
 
   return (
-    <div className="relative block text-xs text-slate-400">
+    <div className="relative block overflow-visible text-xs text-slate-400">
       <span className="mb-1 block">{label}</span>
-      <input
-        ref={inputRef}
-        type="text"
-        role="combobox"
-        aria-expanded={showList}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={
-          showList ? `${listId}-option-${highlighted}` : undefined
-        }
-        value={value}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => {
-          window.setTimeout(() => setOpen(false), 150);
-        }}
-        onKeyDown={onKeyDown}
-        className="mt-0 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-      />
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          role="combobox"
+          aria-expanded={showList}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            showList ? `${listId}-option-${highlighted}` : undefined
+          }
+          value={value}
+          disabled={disabled}
+          placeholder={placeholder}
+          onChange={(e) => {
+            setIsFiltering(true);
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setIsFiltering(false);
+            setOpen(true);
+          }}
+          onBlur={() => {
+            window.setTimeout(() => setOpen(false), 150);
+          }}
+          onKeyDown={onKeyDown}
+          className={`mt-0 w-full rounded border border-slate-600 bg-slate-950 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+            showClear ? 'pl-2 pr-7' : 'px-2'
+          }`}
+        />
+        {showClear && (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={`Clear ${label}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={clearValue}
+            className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+          >
+            <span aria-hidden className="text-sm leading-none">
+              ×
+            </span>
+          </button>
+        )}
+      </div>
       {showList && (
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded border border-slate-600 bg-slate-900 py-1 shadow-lg"
+          className="absolute left-0 z-30 mt-1 max-h-72 min-w-full w-max max-w-2xl overflow-y-auto overflow-x-hidden rounded border border-slate-600 bg-slate-900 py-1 shadow-xl"
         >
           {suggestions.map((item, index) => {
             const text = localeText(item.text, locale);
@@ -180,7 +225,7 @@ export function EffectIdCombobox({
                 id={`${listId}-option-${index}`}
                 role="option"
                 aria-selected={active}
-                className={`cursor-pointer px-2 py-1.5 text-sm ${
+                className={`cursor-pointer px-3 py-2 text-sm leading-snug whitespace-normal ${
                   active
                     ? 'bg-sky-700/40 text-slate-50'
                     : 'text-slate-200 hover:bg-slate-800'
@@ -191,8 +236,8 @@ export function EffectIdCombobox({
               >
                 <span className="font-medium text-sky-300">{item.idGd}</span>
                 <span className="text-slate-400"> — </span>
-                <span className="text-slate-300">
-                  {truncate(text, LABEL_MAX_LEN) || '(no text)'}
+                <span className="text-slate-300 break-words">
+                  {text || '(no text)'}
                 </span>
               </li>
             );
