@@ -28,6 +28,7 @@ export type FilterState = {
   support: EffectSlot;
   factions: string[];
   sets: string[];
+  reference: string;
   name: string;
   handCost: string;
   reserveCost: string;
@@ -58,6 +59,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   support: { t: '', c: '', o: '' },
   factions: [],
   sets: [],
+  reference: '',
   name: '',
   handCost: '',
   reserveCost: '',

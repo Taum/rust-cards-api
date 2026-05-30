@@ -31,6 +31,7 @@ pub fn app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/api/v2/cards", get(cards::get_cards_v2))
+        .route("/api/v2/card/{reference}", get(cards::get_card_v2))
         .route("/api/v2/effects", get(effects::get_effects_v2))
         .layer(CorsLayer::permissive())
         .with_state(state)

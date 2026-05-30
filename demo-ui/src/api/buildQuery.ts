@@ -169,6 +169,29 @@ export function getApiBaseUrl(): string {
   return base.replace(/\/$/, '');
 }
 
+export function buildCardByReferencePath(
+  reference: string,
+  options?: { debugBgaTrigram?: boolean },
+): string {
+  const trimmed = reference.trim();
+  const params = new URLSearchParams();
+  if (options?.debugBgaTrigram) {
+    params.set('debug_bga_trigram', '');
+  }
+  const qs = params.toString();
+  const path = `/api/v2/card/${encodeURIComponent(trimmed)}`;
+  return qs ? `${path}?${qs}` : path;
+}
+
+export function buildCardByReferenceUrl(
+  reference: string,
+  options?: { debugBgaTrigram?: boolean },
+): string {
+  const path = buildCardByReferencePath(reference, options);
+  const apiBase = getApiBaseUrl();
+  return apiBase ? `${apiBase}${path}` : path;
+}
+
 export function buildFullUrl(
   state: FilterState,
   options?: BuildQueryOptions,

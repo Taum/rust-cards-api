@@ -11,7 +11,12 @@ use alt_indexer::idgd_catalog::IdGdCatalog;
 use alt_indexer::stat_index::StatField;
 use roaring::RoaringBitmap;
 
-use crate::loader::{FactionsSummary, IndexManifest, NameSearchIndex, SetBitmaps, StatsSummary};
+use alt_indexer::path::parse_card_reference;
+
+use crate::loader::{
+    FamilyLookupIndex, FamilyResolveError, FactionsSummary, IndexManifest, NameSearchIndex,
+    SetBitmaps, StatsSummary,
+};
 
 /// Shared read-only index data, loaded once at startup and cloned per request via `Arc`.
 #[derive(Clone)]
@@ -36,6 +41,7 @@ pub struct AppStateInner {
     pub factions: BTreeMap<Faction, RoaringBitmap>,
     pub set_bitmaps: SetBitmaps,
     pub name_search_index: NameSearchIndex,
+    pub family_lookup_index: FamilyLookupIndex,
     /// Pre-serialized `GET /api/v2/effects` JSON body.
     pub effects_body: Arc<Bytes>,
 }
@@ -97,6 +103,10 @@ impl AppState {
         &self.inner.name_search_index
     }
 
+    pub fn family_lookup_index(&self) -> &FamilyLookupIndex {
+        &self.inner.family_lookup_index
+    }
+
     pub fn effects_body(&self) -> &Arc<Bytes> {
         &self.inner.effects_body
     }
@@ -108,6 +118,36 @@ impl AppState {
     pub fn decode_reference(&self, card_index: u32) -> anyhow::Result<String> {
         Ok(self.inner.catalog.decode_bit(card_index)?.reference)
     }
+
+    pub fn resolve_card_index(&self, reference: &str) -> Result<u32, CardResolveError> {
+        let parsed = parse_card_reference(reference).map_err(|e| CardResolveError::BadRequest {
+            message: e.to_string(),
+        })?;
+        self.inner
+            .family_lookup_index
+            .resolve(&parsed)
+            .map_err(|e| match e {
+                FamilyResolveError::NotFound => CardResolveError::NotFound {
+                    message: format!("reference not found: {}", parsed.reference()),
+                },
+                FamilyResolveError::Padding => CardResolveError::NotFound {
+                    message: format!(
+                        "reference {} falls in padding (max UniqueID {})",
+                        parsed.reference(),
+                        self.inner
+                            .family_lookup_index
+                            .max_unique_id(&parsed)
+                            .unwrap_or(0)
+                    ),
+                },
+            })
+    }
+}
+
+#[derive(Debug)]
+pub enum CardResolveError {
+    BadRequest { message: String },
+    NotFound { message: String },
 }
 
 impl AppStateInner {

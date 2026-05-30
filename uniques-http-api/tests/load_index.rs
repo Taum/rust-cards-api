@@ -16,6 +16,11 @@ fn loads_minimal_fixture_index() {
     assert!(state.stats().is_empty());
     assert!(state.factions().is_empty());
     assert_eq!(state.name_search_index().by_family().len(), 1);
+    assert_eq!(state.family_lookup_index().len(), 1);
+    assert_eq!(
+        state.family_lookup_index().len(),
+        state.catalog().families.len()
+    );
     assert!(!state.effects_body().is_empty());
 
     let reference = state.decode_reference(0).expect("decode card 0");

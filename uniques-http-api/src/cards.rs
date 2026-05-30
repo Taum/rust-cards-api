@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use axum::extract::{RawQuery, State};
+use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::Json;
 use roaring::RoaringBitmap;
@@ -14,6 +14,7 @@ use alt_indexer::idgd_catalog::IdGdCatalogEntry;
 use alt_indexer::stat_index::StatField;
 
 use crate::loader::{SetBitmaps, SET_CORE, SET_COREKS};
+use crate::state::CardResolveError;
 use crate::AppState;
 
 #[derive(Debug, Serialize)]
@@ -161,6 +162,42 @@ struct CardsRequest {
     recall_cost: Option<CostPredicate>,
     name: Option<String>,
     debug_bga_trigram: bool,
+}
+
+pub async fn get_card_v2(
+    State(state): State<Arc<AppState>>,
+    Path(reference): Path<String>,
+    RawQuery(query): RawQuery,
+) -> ApiResult<Json<CardV2>> {
+    let params = parse_query_multimap(query.as_deref())?;
+    let debug_bga_trigram = params.contains_key("debug_bga_trigram");
+
+    let card_index = state.resolve_card_index(&reference).map_err(|e| match e {
+        CardResolveError::BadRequest { message } => bad_request(message),
+        CardResolveError::NotFound { message } => not_found(message),
+    })?;
+
+    let view = state.card_view(card_index).ok_or_else(|| {
+        not_found(format!("missing compact record for card_index {card_index}"))
+    })?;
+
+    if view.faction_code() == 0 {
+        return Err(not_found(format!("card not indexed at {reference}")));
+    }
+
+    let idgd_by_id: BTreeMap<u32, &IdGdCatalogEntry> = state
+        .idgd_catalog()
+        .entries
+        .iter()
+        .map(|e| (e.id_gd, e))
+        .collect();
+
+    Ok(Json(card_v2_from_index(
+        &state,
+        card_index,
+        &idgd_by_id,
+        debug_bga_trigram,
+    )?))
 }
 
 pub async fn get_cards_v2(
@@ -830,6 +867,58 @@ fn bitmap_line(state: &AppState, line: EffectLine, id_gd: u32) -> RoaringBitmap 
         .unwrap_or_else(RoaringBitmap::new)
 }
 
+fn card_v2_from_index(
+    state: &AppState,
+    card_index: u32,
+    idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
+    debug_bga_trigram: bool,
+) -> ApiResult<CardV2> {
+    let reference = state
+        .decode_reference(card_index)
+        .map_err(|e| bad_request(format!("failed to decode reference for card_index {card_index}: {e}")))?;
+
+    let view = state
+        .card_view(card_index)
+        .ok_or_else(|| bad_request(format!("missing compact record for card_index {card_index}")))?;
+
+    let family = state
+        .catalog()
+        .family_for_bit(card_index)
+        .map_err(|e| bad_request(format!("family lookup for card_index {card_index}: {e}")))?;
+
+    let faction_code = faction_from_code(view.faction_code());
+    let faction_name = alt_indexer::faction_display_name(&faction_code)
+        .unwrap_or("")
+        .to_string();
+
+    Ok(CardV2 {
+        reference,
+        name: family.name.clone(),
+        artist: family.artist.clone(),
+        set: CardSetV2::from(&family.set),
+        card_sub_types: family
+            .card_sub_types
+            .iter()
+            .map(|st| CardSubTypeV2 {
+                reference: st.reference.clone(),
+                name: st.name.clone(),
+            })
+            .collect(),
+        main_cost: view.main_cost(),
+        recall_cost: view.recall_cost(),
+        forest_power: view.forest_power(),
+        mountain_power: view.mountain_power(),
+        ocean_power: view.ocean_power(),
+        faction: CardFaction {
+            code: faction_code,
+            name: faction_name,
+        },
+        main_effect: build_main_effect_localized(idgd_by_id, &view),
+        echo_effect: build_echo_effect_localized(idgd_by_id, &view),
+        debug_bga_trigram: debug_bga_trigram.then(|| build_debug_bga_trigram(&view)),
+    })
+}
+
 fn page_cards_v2(
     state: &AppState,
     bitmap: &RoaringBitmap,
@@ -851,50 +940,12 @@ fn page_cards_v2(
         if cursor.is_some_and(|c| card_index <= c) {
             continue;
         }
-        let reference = state
-            .decode_reference(card_index)
-            .map_err(|e| bad_request(format!("failed to decode reference for card_index {card_index}: {e}")))?;
-
-        let view = state
-            .card_view(card_index)
-            .ok_or_else(|| bad_request(format!("missing compact record for card_index {card_index}")))?;
-
-        let family = state
-            .catalog()
-            .family_for_bit(card_index)
-            .map_err(|e| bad_request(format!("family lookup for card_index {card_index}: {e}")))?;
-
-        let faction_code = faction_from_code(view.faction_code());
-        let faction_name = alt_indexer::faction_display_name(&faction_code)
-            .unwrap_or("")
-            .to_string();
-
-        out.push(CardV2 {
-            reference,
-            name: family.name.clone(),
-            artist: family.artist.clone(),
-            set: CardSetV2::from(&family.set),
-            card_sub_types: family
-                .card_sub_types
-                .iter()
-                .map(|st| CardSubTypeV2 {
-                    reference: st.reference.clone(),
-                    name: st.name.clone(),
-                })
-                .collect(),
-            main_cost: view.main_cost(),
-            recall_cost: view.recall_cost(),
-            forest_power: view.forest_power(),
-            mountain_power: view.mountain_power(),
-            ocean_power: view.ocean_power(),
-            faction: CardFaction {
-                code: faction_code,
-                name: faction_name,
-            },
-            main_effect: build_main_effect_localized(&idgd_by_id, &view),
-            echo_effect: build_echo_effect_localized(&idgd_by_id, &view),
-            debug_bga_trigram: debug_bga_trigram.then(|| build_debug_bga_trigram(&view)),
-        });
+        out.push(card_v2_from_index(
+            state,
+            card_index,
+            &idgd_by_id,
+            debug_bga_trigram,
+        )?);
         last_index = Some(card_index);
         if out.len() >= limit {
             break;
@@ -1060,6 +1111,10 @@ fn bad_request(msg: String) -> (StatusCode, Json<ApiError>) {
     (StatusCode::BAD_REQUEST, Json(ApiError { error: msg }))
 }
 
+fn not_found(msg: String) -> (StatusCode, Json<ApiError>) {
+    (StatusCode::NOT_FOUND, Json(ApiError { error: msg }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1073,7 +1128,10 @@ mod tests {
     use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
     use alt_indexer::stat_index::StatField;
 
-    use crate::loader::{build_name_search_index, build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS};
+    use crate::loader::{
+        build_family_lookup_index, build_name_search_index, build_set_bitmaps, FactionsSummary,
+        IndexManifest, StatsSummary, SET_CORE, SET_COREKS,
+    };
     use crate::state::AppStateInner;
 
     fn test_state() -> AppState {
@@ -1222,6 +1280,7 @@ mod tests {
         let effects_body = Arc::new(crate::effects::serialize_effects_list(&effects_list).unwrap());
         let set_bitmaps = build_set_bitmaps(&catalog);
         let name_search_index = build_name_search_index(&catalog);
+        let family_lookup_index = build_family_lookup_index(&catalog);
 
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
@@ -1256,6 +1315,7 @@ mod tests {
             },
             set_bitmaps,
             name_search_index,
+            family_lookup_index,
         };
 
         AppState::new(Arc::new(inner))
@@ -1312,6 +1372,7 @@ mod tests {
 
         let set_bitmaps = build_set_bitmaps(&catalog);
         let name_search_index = build_name_search_index(&catalog);
+        let family_lookup_index = build_family_lookup_index(&catalog);
         assert!(set_bitmaps.by_set.contains_key(SET_CORE));
         assert!(set_bitmaps.by_set.contains_key(SET_COREKS));
         assert!(set_bitmaps.by_set.contains_key("ALIZE"));
@@ -1348,6 +1409,7 @@ mod tests {
             factions: BTreeMap::new(),
             set_bitmaps,
             name_search_index,
+            family_lookup_index,
         };
 
         AppState::new(Arc::new(inner))

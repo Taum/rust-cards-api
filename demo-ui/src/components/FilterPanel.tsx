@@ -175,6 +175,19 @@ export function FilterPanel({
 
       <section className="space-y-2">
         <label className="block text-sm text-slate-300">
+          Card reference
+          <input
+            type="text"
+            value={filters.reference}
+            onChange={(e) => setFilters({ reference: e.target.value })}
+            placeholder="ALT_CYCLONE_B_BR_77_U_1787"
+            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
+          />
+        </label>
+      </section>
+
+      <section className="space-y-2">
+        <label className="block text-sm text-slate-300">
           Character name
           <input
             type="text"

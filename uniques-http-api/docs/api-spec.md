@@ -1,4 +1,4 @@
-# AI Query Analysis
+# HTTP API summary
 
 ## `GET /api/v2/cards` Parameters
 
@@ -105,6 +105,45 @@ The response is a JSON files which includes the total number of matches, a page 
       ...
     },
   ]
+}
+```
+
+## `GET /api/v2/card/{reference}`
+
+Look up a single card by its full reference id (same object shape as one element of `cards[]` in the search response).
+
+| | |
+| --- | --- |
+| **Path** | `{reference}` — e.g. `ALT_CYCLONE_B_BR_77_U_1787` |
+| **Query** | `debug_bga_trigram` (optional, same as search) |
+
+| Status | Meaning |
+| --- | --- |
+| **200** | One `CardV2` object at the JSON root (`reference`, `name`, `set`, `mainEffect`, …) |
+| **400** | Reference does not match `ALT_<SET>_B_<faction>_<family>_U_<uid>` |
+| **404** | Unknown family, UID beyond family span, or slot not indexed |
+
+Example:
+
+```
+GET /api/v2/card/ALT_COREKS_B_AX_05_U_161
+```
+
+```json
+{
+  "reference": "ALT_COREKS_B_AX_05_U_161",
+  "name": { "en_US": "Ayxas, Repented Tyrant", "fr_FR": "..." },
+  "artist": "Artist Name",
+  "set": { "reference": "COREKS", "name": "Beyond the Gates - KS Edition", "code": "BTG" },
+  "cardSubTypes": [{ "reference": "NOBLE", "name": { "en_US": "Noble", ... } }],
+  "mainCost": 2,
+  "recallCost": 3,
+  "forestPower": 1,
+  "mountainPower": 6,
+  "oceanPower": 3,
+  "faction": { "code": "AX", "name": "Axiom" },
+  "mainEffect": { "en_US": "...", "fr_FR": "..." },
+  "echoEffect": { "en_US": "...", "fr_FR": "..." }
 }
 ```
 

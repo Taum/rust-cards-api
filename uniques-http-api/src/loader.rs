@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
 use alt_indexer::bitmap::{BitmapStore, EffectLine};
 use alt_indexer::catalog::Catalog;
+use alt_indexer::path::ParsedCardPath;
 use alt_indexer::compact::RECORD_SIZE;
 use alt_indexer::faction_index::Faction;
 use alt_indexer::idgd_catalog::IdGdCatalog;
@@ -132,6 +133,82 @@ pub fn normalize_name_for_search(name: &str) -> String {
         .to_lowercase()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FamilyKey {
+    pub set: String,
+    pub faction: String,
+    pub family_number: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FamilySpan {
+    pub start_bit: u32,
+    pub max_unique_id: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct FamilyLookupIndex {
+    by_key: HashMap<FamilyKey, FamilySpan>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FamilyResolveError {
+    NotFound,
+    Padding,
+}
+
+impl FamilyLookupIndex {
+    pub fn len(&self) -> usize {
+        self.by_key.len()
+    }
+
+    pub fn max_unique_id(&self, parsed: &ParsedCardPath) -> Option<u32> {
+        let key = FamilyKey {
+            set: parsed.set.clone(),
+            faction: parsed.faction.clone(),
+            family_number: parsed.family_number.clone(),
+        };
+        self.by_key.get(&key).map(|s| s.max_unique_id)
+    }
+
+    pub fn resolve(&self, parsed: &ParsedCardPath) -> Result<u32, FamilyResolveError> {
+        let key = FamilyKey {
+            set: parsed.set.clone(),
+            faction: parsed.faction.clone(),
+            family_number: parsed.family_number.clone(),
+        };
+        let span = self.by_key.get(&key).ok_or(FamilyResolveError::NotFound)?;
+        if parsed.unique_id > span.max_unique_id {
+            return Err(FamilyResolveError::Padding);
+        }
+        Ok(span.start_bit + parsed.unique_id - 1)
+    }
+}
+
+pub fn build_family_lookup_index(catalog: &Catalog) -> FamilyLookupIndex {
+    let mut by_key = HashMap::new();
+    for family in &catalog.families {
+        let set = family
+            .source_set
+            .as_deref()
+            .unwrap_or(&catalog.set)
+            .to_string();
+        let key = FamilyKey {
+            set,
+            faction: family.faction.clone(),
+            family_number: family.family_number.clone(),
+        };
+        by_key.insert(
+            key,
+            FamilySpan {
+                start_bit: family.start_bit,
+                max_unique_id: family.max_unique_id,
+            },
+        );
+    }
+    FamilyLookupIndex { by_key }
+}
+
 pub fn build_name_search_index(catalog: &Catalog) -> NameSearchIndex {
     let by_family = catalog
         .families
@@ -209,6 +286,12 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         name_search_index.by_family().len()
     );
 
+    let family_lookup_index = build_family_lookup_index(&catalog);
+    eprintln!(
+        "  family lookup index: {} families",
+        family_lookup_index.len()
+    );
+
     let effects_list = build_effects_list(&idgd_catalog);
     let effects_body = Arc::new(serialize_effects_list(&effects_list)?);
     eprintln!(
@@ -235,6 +318,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         factions,
         set_bitmaps,
         name_search_index,
+        family_lookup_index,
         effects_body,
     })))
 }
@@ -378,6 +462,56 @@ fn load_factions(index_dir: &Path, summary: &FactionsSummary) -> Result<BTreeMap
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alt_indexer::catalog::{FamilyEntry, FamilySet};
+    use alt_indexer::path::parse_card_reference;
+
+    fn test_family_entry(start_bit: u32, max_unique_id: u32) -> FamilyEntry {
+        FamilyEntry {
+            start_bit,
+            faction: "AX".to_string(),
+            family_number: "04".to_string(),
+            family_id: "AX_04".to_string(),
+            source_set: None,
+            max_unique_id,
+            card_count: max_unique_id,
+            first_reference: "ALT_TEST_B_AX_04_U_1".to_string(),
+            name: Default::default(),
+            artist: String::new(),
+            card_sub_types: vec![],
+            set: FamilySet {
+                reference: "TEST".to_string(),
+                name: String::new(),
+                code: None,
+            },
+        }
+    }
+
+    #[test]
+    fn family_lookup_index_has_one_entry_per_catalog_family() {
+        let catalog = Catalog {
+            set: "TEST".to_string(),
+            faction_order: vec![],
+            families: vec![test_family_entry(0, 3)],
+            total_bit_span: 3,
+        };
+        let index = build_family_lookup_index(&catalog);
+        assert_eq!(index.len(), 1);
+        let parsed = parse_card_reference("ALT_TEST_B_AX_04_U_2").unwrap();
+        assert_eq!(index.resolve(&parsed).unwrap(), 1);
+    }
+
+    #[test]
+    fn family_lookup_index_rejects_padding_uid() {
+        let catalog = Catalog {
+            set: "TEST".to_string(),
+            faction_order: vec![],
+            families: vec![test_family_entry(10, 1)],
+            total_bit_span: 11,
+        };
+        let index = build_family_lookup_index(&catalog);
+        let parsed = parse_card_reference("ALT_TEST_B_AX_04_U_99").unwrap();
+        assert_eq!(index.resolve(&parsed), Err(FamilyResolveError::Padding));
+    }
 
     #[test]
     fn normalize_name_for_search_folds_diacritics_and_lowercases() {

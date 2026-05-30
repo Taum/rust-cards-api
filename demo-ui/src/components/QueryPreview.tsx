@@ -15,9 +15,14 @@ function decodeQueryText(encoded: string): string {
 }
 
 function buildDisplayPath(queryString: string | null): string {
-  return queryString
-    ? `/api/v2/cards?${decodeQueryText(queryString)}`
-    : "/api/v2/cards";
+  if (!queryString) {
+    return "/api/v2/cards";
+  }
+  // Card-by-reference mode stores a full path, not a cards search query string.
+  if (queryString.startsWith("/api/v2/card/")) {
+    return queryString;
+  }
+  return `/api/v2/cards?${decodeQueryText(queryString)}`;
 }
 
 export function QueryPreview({ queryString, url }: QueryPreviewProps) {
