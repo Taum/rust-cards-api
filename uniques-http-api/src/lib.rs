@@ -6,6 +6,7 @@ use tower_http::cors::CorsLayer;
 
 mod cards;
 mod effects;
+mod effects_filtered;
 mod env;
 
 pub mod loader;
@@ -33,6 +34,10 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/api/v2/cards", get(cards::get_cards_v2))
         .route("/api/v2/card/{reference}", get(cards::get_card_v2))
         .route("/api/v2/effects", get(effects::get_effects_v2))
+        .route(
+            "/api/v2/effects/filtered",
+            get(effects_filtered::get_effects_filtered),
+        )
         .layer(CorsLayer::permissive())
         .with_state(state)
 }

@@ -223,3 +223,49 @@ It returns a list of the Effect parts available for filtering.
 }
 ```
 
+## `GET /api/v2/effects/filtered`
+
+Per-combobox autocomplete narrowing. Given the current filters and which effect box the user is
+editing, returns just the idGds for that box that would still yield an ability that actually exists.
+Use `/api/v2/effects` once for labels/text; use this endpoint to narrow the candidate ids as filters
+are added. Presence-only, ids-only. Typically responds in a few milliseconds.
+
+### Parameters
+
+The client sends its **full current filter state** exactly as it would to `/api/v2/cards`
+(`effect[N][...]`, `support[...]`, `effectMode`, `faction`, `set`, `mainCost`/`recallCost`, `name`) —
+**including the group being edited** — plus one extra param:
+
+| Supported | Parameter | Type / Encoding | Example | Meaning |
+| --------- | --------- | --------------- | ------- | ------- |
+| Yes | `editing` | `<part>:<slot>` | `editing=trigger:0` | The box being edited. `part` is `trigger`, `condition`, or `output`. `slot` is a main-effect slot index (`0`, `1`, ... matching the `effect[N]` indices) or the literal `support` for the echo/support slot. Examples: `condition:1`, `output:support`. |
+
+Semantics:
+
+- The trigger/condition/output of one group form a single ability that must co-occur on the **same
+  line**. Candidates are returned only if they co-occur, on the same line, with the group's other
+  two boxes (and satisfy all the other filters). Main slots search lines M1/M2/M3; `support` searches
+  the echo line.
+- The server **excludes the edited group** (identified by `editing`'s slot) from the search space,
+  so the box's own current value never filters out the alternatives the user might pick instead.
+- If `slot` refers to a group not present in the filters (a brand-new, empty group), there are no
+  co-constraints and nothing to exclude — candidates are narrowed by the remaining filters only.
+- Guarantee: every returned id, when set in that box and posted to `/api/v2/cards`, yields >= 1 card
+  (exact for the default `effectMode=and`; `or` across multiple groups is best-effort).
+
+### Response
+
+Ids only (the client already has localized text from its initial `/api/v2/effects` load):
+
+```
+{
+  "editing": "trigger:0",
+  "idGds": [1, 5, 24, ...]
+}
+```
+
+| Status | Meaning |
+| --- | --- |
+| **200** | `{ editing, idGds }` |
+| **400** | Missing/invalid `editing` (bad `part` or `slot`), or a co-constraint idGd of the wrong type |
+

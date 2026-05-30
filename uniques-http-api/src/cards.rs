@@ -87,7 +87,7 @@ pub struct ApiError {
     pub error: String,
 }
 
-type ApiResult<T> = Result<T, (StatusCode, Json<ApiError>)>;
+pub(crate) type ApiResult<T> = Result<T, (StatusCode, Json<ApiError>)>;
 
 #[derive(Debug, Clone, Copy)]
 enum IdGdSelector {
@@ -113,12 +113,12 @@ enum EffectCombineMode {
     Or,
 }
 
-#[derive(Debug, Default)]
-struct EffectSlotFilter {
-    index: u32,
-    t: Vec<u32>,
-    c: Vec<u32>,
-    o: Vec<u32>,
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EffectSlotFilter {
+    pub(crate) index: u32,
+    pub(crate) t: Vec<u32>,
+    pub(crate) c: Vec<u32>,
+    pub(crate) o: Vec<u32>,
 }
 
 impl EffectSlotFilter {
@@ -127,13 +127,13 @@ impl EffectSlotFilter {
     }
 }
 
-#[derive(Debug, Default)]
-struct AbilityFilters {
-    effects: Vec<EffectSlotFilter>,
+#[derive(Debug, Default, Clone)]
+pub(crate) struct AbilityFilters {
+    pub(crate) effects: Vec<EffectSlotFilter>,
     effect_mode: EffectCombineMode,
-    support_t: Vec<u32>,
-    support_c: Vec<u32>,
-    support_o: Vec<u32>,
+    pub(crate) support_t: Vec<u32>,
+    pub(crate) support_c: Vec<u32>,
+    pub(crate) support_o: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -151,11 +151,11 @@ enum CostPredicate {
     Range { op: CompareOp, value: u8 },
 }
 
-#[derive(Debug)]
-struct CardsRequest {
+#[derive(Debug, Clone)]
+pub(crate) struct CardsRequest {
     limit: usize,
     cursor: Option<u32>,
-    filters: AbilityFilters,
+    pub(crate) filters: AbilityFilters,
     factions: Vec<Faction>,
     sets: Vec<String>,
     main_cost: Option<CostPredicate>,
@@ -220,9 +220,9 @@ pub async fn get_cards_v2(
     }))
 }
 
-type QueryMultiMap = HashMap<String, Vec<String>>;
+pub(crate) type QueryMultiMap = HashMap<String, Vec<String>>;
 
-fn parse_query_multimap(query: Option<&str>) -> ApiResult<QueryMultiMap> {
+pub(crate) fn parse_query_multimap(query: Option<&str>) -> ApiResult<QueryMultiMap> {
     let mut out: QueryMultiMap = HashMap::new();
     let Some(query) = query else {
         return Ok(out);
@@ -244,7 +244,7 @@ fn has_any(params: &QueryMultiMap, key: &str) -> bool {
     params.get(key).is_some_and(|v| v.iter().any(|s| !s.trim().is_empty()))
 }
 
-fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsRequest> {
+pub(crate) fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsRequest> {
     let limit = match get_first(params, "limit") {
         None => 50usize,
         Some(v) => parse_usize("limit", v)?,
@@ -666,7 +666,7 @@ fn validate_idgd_types(state: &AppState, filters: &AbilityFilters) -> ApiResult<
     Ok(())
 }
 
-fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap> {
+pub(crate) fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap> {
     let mut groups = Vec::new();
 
     // Each effect[N] searches main lines only (M1/M2/M3) with per-line bucket intersection,
@@ -1107,7 +1107,7 @@ fn parse_usize(field: &str, s: &str) -> ApiResult<usize> {
         .map_err(|_| bad_request(format!("invalid {field} value '{s}'")))
 }
 
-fn bad_request(msg: String) -> (StatusCode, Json<ApiError>) {
+pub(crate) fn bad_request(msg: String) -> (StatusCode, Json<ApiError>) {
     (StatusCode::BAD_REQUEST, Json(ApiError { error: msg }))
 }
 
