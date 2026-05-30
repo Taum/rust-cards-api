@@ -185,6 +185,38 @@ impl FamilyLookupIndex {
     }
 }
 
+/// One logical family in merge order; CORE+COREKS rows with the same `family_id` share one range.
+#[derive(Debug, Clone)]
+pub struct FamilySpanGroup {
+    pub family_id: String,
+    pub faction: String,
+    pub family_number: String,
+    pub range_start: u32,
+    /// Exclusive end: last row `start_bit + max_unique_id`.
+    pub range_end: u32,
+}
+
+pub fn build_family_span_groups(catalog: &Catalog) -> Vec<FamilySpanGroup> {
+    let mut out: Vec<FamilySpanGroup> = Vec::new();
+    for family in &catalog.families {
+        let end = family.start_bit.saturating_add(family.max_unique_id);
+        if let Some(last) = out.last_mut() {
+            if last.family_id == family.family_id && last.range_end == family.start_bit {
+                last.range_end = end;
+                continue;
+            }
+        }
+        out.push(FamilySpanGroup {
+            family_id: family.family_id.clone(),
+            faction: family.faction.clone(),
+            family_number: family.family_number.clone(),
+            range_start: family.start_bit,
+            range_end: end,
+        });
+    }
+    out
+}
+
 pub fn build_family_lookup_index(catalog: &Catalog) -> FamilyLookupIndex {
     let mut by_key = HashMap::new();
     for family in &catalog.families {
@@ -292,6 +324,13 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         family_lookup_index.len()
     );
 
+    let family_span_groups = build_family_span_groups(&catalog);
+    eprintln!(
+        "  family span groups: {} ({} catalog rows)",
+        family_span_groups.len(),
+        catalog.families.len()
+    );
+
     let effects_list = build_effects_list(&idgd_catalog);
     let effects_body = Arc::new(serialize_effects_list(&effects_list)?);
     eprintln!(
@@ -319,6 +358,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         set_bitmaps,
         name_search_index,
         family_lookup_index,
+        family_span_groups,
         effects_body,
     })))
 }
@@ -511,6 +551,47 @@ mod tests {
         let index = build_family_lookup_index(&catalog);
         let parsed = parse_card_reference("ALT_TEST_B_AX_04_U_99").unwrap();
         assert_eq!(index.resolve(&parsed), Err(FamilyResolveError::Padding));
+    }
+
+    fn test_family_entry_with_set(
+        start_bit: u32,
+        max_unique_id: u32,
+        family_id: &str,
+        source_set: &str,
+    ) -> FamilyEntry {
+        let mut entry = test_family_entry(start_bit, max_unique_id);
+        entry.family_id = family_id.to_string();
+        entry.source_set = Some(source_set.to_string());
+        entry
+    }
+
+    #[test]
+    fn family_span_groups_merges_adjacent_core_coreks_rows() {
+        let catalog = Catalog {
+            set: "ALL_SETS".to_string(),
+            faction_order: vec![],
+            families: vec![
+                test_family_entry_with_set(0, 3, "AX_04", SET_COREKS),
+                test_family_entry_with_set(3, 3, "AX_04", SET_CORE),
+                test_family_entry_with_set(6, 2, "AX_05", SET_COREKS),
+            ],
+            total_bit_span: 8,
+        };
+        let groups = build_family_span_groups(&catalog);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].family_id, "AX_04");
+        assert_eq!(groups[0].range_start, 0);
+        assert_eq!(groups[0].range_end, 6);
+        assert_eq!(groups[1].family_id, "AX_05");
+        assert_eq!(groups[1].range_start, 6);
+        assert_eq!(groups[1].range_end, 8);
+
+        let mut bmp = RoaringBitmap::new();
+        bmp.insert(1);
+        bmp.insert(4);
+        assert_eq!(bmp.range_cardinality(0..6), 2);
+        assert_eq!(bmp.range_cardinality(0..3), 1);
+        assert_eq!(bmp.range_cardinality(3..6), 1);
     }
 
     #[test]

@@ -77,9 +77,20 @@ pub struct CardV2 {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FamilyMatchV2 {
+    pub family_id: String,
+    pub count: u64,
+    pub reference: String,
+    pub name: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct CardsResponse {
     pub iter: CardsIter,
     pub cards: Vec<CardV2>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub families: Option<Vec<FamilyMatchV2>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -162,6 +173,7 @@ pub(crate) struct CardsRequest {
     recall_cost: Option<CostPredicate>,
     name: Option<String>,
     debug_bga_trigram: bool,
+    with_families: bool,
 }
 
 pub async fn get_card_v2(
@@ -208,8 +220,21 @@ pub async fn get_cards_v2(
     let req = parse_request(&state, &params)?;
     let bitmap = build_bitmap(&state, &req)?;
     let total = bitmap.len() as u64;
-    let (cards, next_cursor) =
-        page_cards_v2(&state, &bitmap, req.cursor, req.limit, req.debug_bga_trigram)?;
+
+    let (cards, next_cursor, families) = if req.with_families && req.cursor.is_none() {
+        let (families, example_indices) = families_from_bitmap(&state, &bitmap)?;
+        let cards = cards_from_indices(&state, &example_indices, req.debug_bga_trigram)?;
+        (cards, None, Some(families))
+    } else {
+        let (cards, next_cursor) = page_cards_v2(
+            &state,
+            &bitmap,
+            req.cursor,
+            req.limit,
+            req.debug_bga_trigram,
+        )?;
+        (cards, next_cursor, None)
+    };
 
     Ok(Json(CardsResponse {
         iter: CardsIter {
@@ -217,6 +242,7 @@ pub async fn get_cards_v2(
             cursor: next_cursor,
         },
         cards,
+        families,
     }))
 }
 
@@ -284,6 +310,7 @@ pub(crate) fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResu
     let recall_cost = parse_cost_predicate(params, "recallCost")?;
     let name = parse_name(params);
     let debug_bga_trigram = params.contains_key("debug_bga_trigram");
+    let with_families = params.contains_key("withFamilies");
 
     validate_idgd_types(state, &filters)?;
 
@@ -297,6 +324,7 @@ pub(crate) fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResu
         recall_cost,
         name,
         debug_bga_trigram,
+        with_families,
     })
 }
 
@@ -919,6 +947,80 @@ fn card_v2_from_index(
     })
 }
 
+fn first_match_in_range(bitmap: &RoaringBitmap, start: u32, end: u32) -> Option<u32> {
+    bitmap.range(start..end).next()
+}
+
+fn family_match_from_index(
+    state: &AppState,
+    card_index: u32,
+    family_id: &str,
+    count: u64,
+) -> ApiResult<FamilyMatchV2> {
+    let reference = state
+        .decode_reference(card_index)
+        .map_err(|e| bad_request(format!("failed to decode reference for card_index {card_index}: {e}")))?;
+
+    let family = state
+        .catalog()
+        .family_for_bit(card_index)
+        .map_err(|e| bad_request(format!("family lookup for card_index {card_index}: {e}")))?;
+
+    Ok(FamilyMatchV2 {
+        family_id: family_id.to_string(),
+        count,
+        reference,
+        name: family.name.clone(),
+    })
+}
+
+fn families_from_bitmap(
+    state: &AppState,
+    bitmap: &RoaringBitmap,
+) -> ApiResult<(Vec<FamilyMatchV2>, Vec<u32>)> {
+    let mut families = Vec::new();
+    let mut example_indices = Vec::new();
+    for group in state.family_span_groups() {
+        let count = bitmap.range_cardinality(group.range_start..group.range_end);
+        if count == 0 {
+            continue;
+        }
+        let Some(card_index) =
+            first_match_in_range(bitmap, group.range_start, group.range_end)
+        else {
+            continue;
+        };
+        families.push(family_match_from_index(
+            state,
+            card_index,
+            &group.family_id,
+            count,
+        )?);
+        example_indices.push(card_index);
+    }
+    Ok((families, example_indices))
+}
+
+fn cards_from_indices(
+    state: &AppState,
+    indices: &[u32],
+    debug_bga_trigram: bool,
+) -> ApiResult<Vec<CardV2>> {
+    let idgd_by_id: BTreeMap<u32, &IdGdCatalogEntry> = state
+        .idgd_catalog()
+        .entries
+        .iter()
+        .map(|e| (e.id_gd, e))
+        .collect();
+
+    indices
+        .iter()
+        .map(|&card_index| {
+            card_v2_from_index(state, card_index, &idgd_by_id, debug_bga_trigram)
+        })
+        .collect()
+}
+
 fn page_cards_v2(
     state: &AppState,
     bitmap: &RoaringBitmap,
@@ -952,7 +1054,6 @@ fn page_cards_v2(
         }
     }
 
-    // Only return a cursor when there may be another page.
     let next_cursor = if out.len() == limit { last_index } else { None };
 
     Ok((out, next_cursor))
@@ -1129,7 +1230,8 @@ mod tests {
     use alt_indexer::stat_index::StatField;
 
     use crate::loader::{
-        build_family_lookup_index, build_name_search_index, build_set_bitmaps, FactionsSummary,
+        build_family_lookup_index, build_family_span_groups, build_name_search_index,
+        build_set_bitmaps, FactionsSummary,
         IndexManifest, StatsSummary, SET_CORE, SET_COREKS,
     };
     use crate::state::AppStateInner;
@@ -1281,6 +1383,7 @@ mod tests {
         let set_bitmaps = build_set_bitmaps(&catalog);
         let name_search_index = build_name_search_index(&catalog);
         let family_lookup_index = build_family_lookup_index(&catalog);
+        let family_span_groups = build_family_span_groups(&catalog);
 
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
@@ -1316,6 +1419,7 @@ mod tests {
             set_bitmaps,
             name_search_index,
             family_lookup_index,
+            family_span_groups,
         };
 
         AppState::new(Arc::new(inner))
@@ -1354,7 +1458,7 @@ mod tests {
             families: vec![
                 family_entry(0, SET_CORE, "01", "Kelon Elemental"),
                 family_entry(5, SET_COREKS, "01", "Kelon Elemental"),
-                family_entry(10, "ALIZE", "01", "Other Character"),
+                family_entry(10, "ALIZE", "02", "Other Character"),
             ],
             total_bit_span: 15,
         };
@@ -1373,6 +1477,7 @@ mod tests {
         let set_bitmaps = build_set_bitmaps(&catalog);
         let name_search_index = build_name_search_index(&catalog);
         let family_lookup_index = build_family_lookup_index(&catalog);
+        let family_span_groups = build_family_span_groups(&catalog);
         assert!(set_bitmaps.by_set.contains_key(SET_CORE));
         assert!(set_bitmaps.by_set.contains_key(SET_COREKS));
         assert!(set_bitmaps.by_set.contains_key("ALIZE"));
@@ -1410,9 +1515,64 @@ mod tests {
             set_bitmaps,
             name_search_index,
             family_lookup_index,
+            family_span_groups,
         };
 
         AppState::new(Arc::new(inner))
+    }
+
+    #[test]
+    fn parse_with_families_flag() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("withFamilies".to_string(), vec!["".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        assert!(req.with_families);
+    }
+
+    #[test]
+    fn families_from_bitmap_merges_core_coreks_span() {
+        let state = test_state_with_sets();
+        let groups = state.family_span_groups();
+        assert_eq!(groups.len(), 2);
+        let ax01 = groups.iter().find(|g| g.family_id == "AX_01").unwrap();
+        assert_eq!(ax01.range_start, 0);
+        assert_eq!(ax01.range_end, 10);
+
+        let mut bmp = RoaringBitmap::new();
+        bmp.insert(1);
+        bmp.insert(6);
+
+        let (families, ensure) = families_from_bitmap(&state, &bmp).unwrap();
+        assert_eq!(families.len(), 1);
+        assert_eq!(families[0].family_id, "AX_01");
+        assert_eq!(families[0].count, 2);
+        assert_eq!(families[0].reference, "ALT_CORE_B_AX_01_U_2");
+        assert_eq!(
+            families[0].name.get("en_US").map(String::as_str),
+            Some("Kelon Elemental")
+        );
+
+        let cards = cards_from_indices(&state, &ensure, false).unwrap();
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].reference, families[0].reference);
+    }
+
+    #[test]
+    fn cards_from_indices_matches_families_only() {
+        let state = test_state_with_sets();
+        let mut bmp = RoaringBitmap::new();
+        for i in 0..15 {
+            bmp.insert(i);
+        }
+        let (families, ensure) = families_from_bitmap(&state, &bmp).unwrap();
+        assert_eq!(families.len(), 2);
+
+        let cards = cards_from_indices(&state, &ensure, false).unwrap();
+        assert_eq!(cards.len(), families.len());
+        for (card, fam) in cards.iter().zip(&families) {
+            assert_eq!(card.reference, fam.reference);
+        }
     }
 
     #[test]

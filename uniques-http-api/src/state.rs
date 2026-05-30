@@ -14,8 +14,8 @@ use roaring::RoaringBitmap;
 use alt_indexer::path::parse_card_reference;
 
 use crate::loader::{
-    FamilyLookupIndex, FamilyResolveError, FactionsSummary, IndexManifest, NameSearchIndex,
-    SetBitmaps, StatsSummary,
+    FamilyLookupIndex, FamilyResolveError, FamilySpanGroup, FactionsSummary, IndexManifest,
+    NameSearchIndex, SetBitmaps, StatsSummary,
 };
 
 /// Shared read-only index data, loaded once at startup and cloned per request via `Arc`.
@@ -42,6 +42,7 @@ pub struct AppStateInner {
     pub set_bitmaps: SetBitmaps,
     pub name_search_index: NameSearchIndex,
     pub family_lookup_index: FamilyLookupIndex,
+    pub family_span_groups: Vec<FamilySpanGroup>,
     /// Pre-serialized `GET /api/v2/effects` JSON body.
     pub effects_body: Arc<Bytes>,
 }
@@ -105,6 +106,10 @@ impl AppState {
 
     pub fn family_lookup_index(&self) -> &FamilyLookupIndex {
         &self.inner.family_lookup_index
+    }
+
+    pub fn family_span_groups(&self) -> &[FamilySpanGroup] {
+        &self.inner.family_span_groups
     }
 
     pub fn effects_body(&self) -> &Arc<Bytes> {
