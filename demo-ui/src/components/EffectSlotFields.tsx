@@ -1,10 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   catalogOptionsForRegion,
   type EffectRegion,
 } from '../api/effectCatalogOptions';
+import type { FilteredEffectsTarget } from '../api/buildQuery';
+import { useFilteredEffectOptions } from '../hooks/useFilteredEffectOptions';
 import type { CardLocale } from '../locale';
-import type { EffectCatalogItem, EffectSlot, EffectsCatalogResponse } from '../types';
+import type {
+  EffectCatalogItem,
+  EffectPart,
+  EffectSlot,
+  EffectsCatalogResponse,
+  FilterState,
+} from '../types';
 import { EffectIdCombobox } from './EffectIdCombobox';
 import { EffectSlotSelectionSummary } from './EffectSlotSelectionSummary';
 
@@ -19,6 +27,8 @@ type EffectSlotFieldsProps = {
   effectsLoading: boolean;
   locale: CardLocale;
   region: EffectRegion;
+  /** Full current filter state, used to narrow suggestions for the focused box. */
+  filters: FilterState;
 };
 
 const EMPTY_OPTIONS: EffectCatalogItem[] = [];
@@ -34,12 +44,39 @@ export function EffectSlotFields({
   effectsLoading,
   locale,
   region,
+  filters,
 }: EffectSlotFieldsProps) {
   const heading =
     title ?? (slotIndex !== undefined ? `Effect [${slotIndex}]` : 'Effect');
   const update = (field: keyof EffectSlot, value: string) => {
     onChange({ ...slot, [field]: value });
   };
+
+  const [focusedPart, setFocusedPart] = useState<EffectPart | null>(null);
+
+  const target = useMemo<FilteredEffectsTarget | null>(() => {
+    if (!focusedPart) {
+      return null;
+    }
+    return { region, slotIndex: slotIndex ?? 0, part: focusedPart };
+  }, [focusedPart, region, slotIndex]);
+
+  const { ids: availableIds, loading: narrowing } = useFilteredEffectOptions(
+    filters,
+    target,
+    focusedPart !== null,
+  );
+
+  const handleFocusChange = (part: EffectPart) => (focused: boolean) => {
+    setFocusedPart((current) =>
+      focused ? part : current === part ? null : current,
+    );
+  };
+
+  const idsFor = (part: EffectPart) =>
+    focusedPart === part ? availableIds : null;
+  const narrowingFor = (part: EffectPart) =>
+    focusedPart === part && narrowing;
 
   const { triggers, conditions, output: outputs } = useMemo(() => {
     if (!catalog) {
@@ -76,6 +113,9 @@ export function EffectSlotFields({
           locale={locale}
           disabled={comboboxDisabled}
           placeholder="e.g. 24,191"
+          availableIds={idsFor('t')}
+          narrowing={narrowingFor('t')}
+          onFocusChange={handleFocusChange('t')}
         />
         <EffectIdCombobox
           label="Condition (c)"
@@ -85,6 +125,9 @@ export function EffectSlotFields({
           locale={locale}
           disabled={comboboxDisabled}
           placeholder="e.g. 191"
+          availableIds={idsFor('c')}
+          narrowing={narrowingFor('c')}
+          onFocusChange={handleFocusChange('c')}
         />
         <EffectIdCombobox
           label="Output (o)"
@@ -95,6 +138,9 @@ export function EffectSlotFields({
           disabled={comboboxDisabled}
           placeholder="e.g. 90"
           menuAlign="end"
+          availableIds={idsFor('o')}
+          narrowing={narrowingFor('o')}
+          onFocusChange={handleFocusChange('o')}
         />
       </div>
       <EffectSlotSelectionSummary

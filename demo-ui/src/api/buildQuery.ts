@@ -1,5 +1,11 @@
 import { parseCostInput } from './parseCostInput';
-import type { BuildQueryResult, EffectSlot, FilterState } from '../types';
+import type { EffectRegion } from './effectCatalogOptions';
+import type {
+  BuildQueryResult,
+  EffectPart,
+  EffectSlot,
+  FilterState,
+} from '../types';
 
 function slotHasValues(slot: EffectSlot): boolean {
   return slot.t.trim() !== '' || slot.c.trim() !== '' || slot.o.trim() !== '';
@@ -7,6 +13,21 @@ function slotHasValues(slot: EffectSlot): boolean {
 
 export function activeEffectSlotCount(state: FilterState): number {
   return state.effects.filter(slotHasValues).length;
+}
+
+/**
+ * Index a main effect slot would occupy in the compacted `effect[N]` numbering
+ * (empty UI slots are skipped). Matches the renumbering done in `appendFilterParams`.
+ */
+function compactedSlotIndex(state: FilterState, uiIndex: number): number {
+  let count = 0;
+  const end = Math.min(uiIndex, state.effects.length);
+  for (let i = 0; i < end; i += 1) {
+    if (slotHasValues(state.effects[i])) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function appendCostParams(
@@ -43,12 +64,21 @@ export type BuildQueryOptions = {
   cursor?: number;
 };
 
-export function buildQuery(
-  state: FilterState,
-  options?: BuildQueryOptions,
-): BuildQueryResult {
-  const params = new URLSearchParams();
+type AppendFilterParamsResult = {
+  handCostError?: string;
+  reserveCostError?: string;
+};
 
+/**
+ * Append the shared `/api/v2/cards`-style filter params (effects, effectMode,
+ * support, factions, sets, name, costs) used by both the cards query and the
+ * filtered-effects query. Cost parsing is best-effort: invalid costs are
+ * skipped and reported via the return value rather than throwing.
+ */
+function appendFilterParams(
+  params: URLSearchParams,
+  state: FilterState,
+): AppendFilterParamsResult {
   let handCostError: string | undefined;
   let reserveCostError: string | undefined;
 
@@ -113,6 +143,17 @@ export function buildQuery(
     }
   }
 
+  return { handCostError, reserveCostError };
+}
+
+export function buildQuery(
+  state: FilterState,
+  options?: BuildQueryOptions,
+): BuildQueryResult {
+  const params = new URLSearchParams();
+
+  const { handCostError, reserveCostError } = appendFilterParams(params, state);
+
   if (handCostError || reserveCostError) {
     return { ok: false, handCostError, reserveCostError };
   }
@@ -162,6 +203,52 @@ export function buildRequestPath(
     queryString: qs,
     path: qs ? `/api/v2/cards?${qs}` : '/api/v2/cards',
   };
+}
+
+/** Which combobox is being edited, used to build the `editing=<part>:<slot>` param. */
+export type FilteredEffectsTarget = {
+  region: EffectRegion;
+  /** UI index in `state.effects` (ignored for the `echo`/support region). */
+  slotIndex: number;
+  part: EffectPart;
+};
+
+const EFFECT_PART_NAMES: Record<EffectPart, string> = {
+  t: 'trigger',
+  c: 'condition',
+  o: 'output',
+};
+
+/**
+ * Build the query for `GET /api/v2/effects/filtered`: the full current filter
+ * state (including the edited group, which the server strips by index) plus an
+ * `editing=<part>:<slot>` param. Cost-parse errors are ignored so narrowing is
+ * never blocked by an in-progress cost edit.
+ */
+export function buildFilteredEffectsQuery(
+  state: FilterState,
+  target: FilteredEffectsTarget,
+): URLSearchParams {
+  const params = new URLSearchParams();
+  appendFilterParams(params, state);
+
+  const slot =
+    target.region === 'echo'
+      ? 'support'
+      : String(compactedSlotIndex(state, target.slotIndex));
+  params.set('editing', `${EFFECT_PART_NAMES[target.part]}:${slot}`);
+
+  return params;
+}
+
+export function buildFilteredEffectsUrl(
+  state: FilterState,
+  target: FilteredEffectsTarget,
+): string {
+  const qs = buildFilteredEffectsQuery(state, target).toString();
+  const path = `/api/v2/effects/filtered${qs ? `?${qs}` : ''}`;
+  const apiBase = getApiBaseUrl();
+  return apiBase ? `${apiBase}${path}` : path;
 }
 
 export function getApiBaseUrl(): string {

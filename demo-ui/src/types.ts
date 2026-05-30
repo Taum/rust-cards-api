@@ -22,6 +22,15 @@ export type EffectsCatalogStatus = 'loading' | 'ready' | 'error';
 
 export type EffectMode = 'and' | 'or';
 
+/** Which part of an effect group a combobox edits (maps to trigger/condition/output). */
+export type EffectPart = 't' | 'c' | 'o';
+
+/** Response from `GET /api/v2/effects/filtered`. */
+export type EffectsFilteredResponse = {
+  editing: string;
+  idGds: number[];
+};
+
 export type FilterState = {
   effects: EffectSlot[];
   effectMode: EffectMode;

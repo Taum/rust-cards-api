@@ -149,6 +149,7 @@ export function FilterPanel({
             effectsLoading={effectsLoading}
             locale={locale}
             region="main"
+            filters={filters}
           />
         ))}
         <button
@@ -170,6 +171,7 @@ export function FilterPanel({
           effectsLoading={effectsLoading}
           locale={locale}
           region="echo"
+          filters={filters}
         />
       </section>
 

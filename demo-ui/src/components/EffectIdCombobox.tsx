@@ -54,6 +54,18 @@ type EffectIdComboboxProps = {
 
   menuAlign?: EffectMenuAlign;
 
+  /** When non-null, restrict suggestions to these idGds (live narrowing). */
+
+  availableIds?: number[] | null;
+
+  /** True while a narrowing request for this box is in flight. */
+
+  narrowing?: boolean;
+
+  /** Fired when this box gains (true) or loses (false) focus. */
+
+  onFocusChange?: (focused: boolean) => void;
+
 };
 
 
@@ -264,6 +276,12 @@ export function EffectIdCombobox({
 
   menuAlign = 'start',
 
+  availableIds = null,
+
+  narrowing = false,
+
+  onFocusChange,
+
 }: EffectIdComboboxProps) {
 
   const listId = useId();
@@ -286,21 +304,51 @@ export function EffectIdCombobox({
 
 
 
-  const suggestions = useMemo(() => {
+  const availableSet = useMemo(
 
-    if (!isFiltering) {
+    () => (availableIds == null ? null : new Set(availableIds)),
+
+    [availableIds],
+
+  );
+
+
+
+  const narrowedOptions = useMemo(() => {
+
+    if (!availableSet) {
 
       return options;
 
     }
 
-    return options
+    return options.filter((item) => availableSet.has(item.idGd));
+
+  }, [options, availableSet]);
+
+
+
+  const suggestions = useMemo(() => {
+
+    if (!isFiltering) {
+
+      return narrowedOptions;
+
+    }
+
+    return narrowedOptions
 
       .filter((item) => matchesOption(item, token, locale))
 
       .slice(0, MAX_FILTERED_SUGGESTIONS);
 
-  }, [options, token, locale, isFiltering]);
+  }, [narrowedOptions, token, locale, isFiltering]);
+
+
+
+  const narrowingActive = availableSet != null;
+
+  const noneAvailable = narrowingActive && !narrowing && narrowedOptions.length === 0;
 
 
 
@@ -574,9 +622,13 @@ export function EffectIdCombobox({
 
             setOpen(true);
 
+            onFocusChange?.(true);
+
           }}
 
           onBlur={() => {
+
+            onFocusChange?.(false);
 
             window.setTimeout(() => setOpen(false), 150);
 
@@ -621,6 +673,32 @@ export function EffectIdCombobox({
         )}
 
       </div>
+
+      {narrowingActive && (
+
+        <span
+
+          className={`mt-1 block text-[11px] ${
+
+            noneAvailable ? 'text-amber-400' : 'text-slate-500'
+
+          }`}
+
+        >
+
+          {narrowing
+
+            ? 'Narrowing…'
+
+            : noneAvailable
+
+              ? 'No effects possible with current filters'
+
+              : `${narrowedOptions.length} possible`}
+
+        </span>
+
+      )}
 
       {listbox && createPortal(listbox, document.body)}
 
