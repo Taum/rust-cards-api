@@ -12,6 +12,7 @@ use alt_indexer::stat_index::StatField;
 use anyhow::{bail, Context, Result};
 use roaring::RoaringBitmap;
 use serde::Deserialize;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::effects::{build_effects_list, serialize_effects_list};
 use crate::state::{AppState, AppStateInner};
@@ -99,6 +100,53 @@ pub fn build_set_bitmaps(catalog: &Catalog) -> SetBitmaps {
     }
 }
 
+/// Lowercased locale names per catalog family row, built once at index load.
+#[derive(Debug, Clone)]
+pub struct NameSearchIndex {
+    by_family: Vec<Vec<String>>,
+}
+
+impl NameSearchIndex {
+    pub fn by_family(&self) -> &[Vec<String>] {
+        &self.by_family
+    }
+
+    pub fn bitmap_for_contains(&self, catalog: &Catalog, query: &str) -> RoaringBitmap {
+        let needle = normalize_name_for_search(query);
+        let mut bmp = RoaringBitmap::new();
+        for (family, names) in catalog.families.iter().zip(&self.by_family) {
+            if names.iter().any(|name| name.contains(&needle)) {
+                let end = family.start_bit.saturating_add(family.max_unique_id);
+                bmp.insert_range(family.start_bit..end);
+            }
+        }
+        bmp
+    }
+}
+
+/// Lowercase and strip combining marks so `elementaire` matches `Élémentaire`.
+pub fn normalize_name_for_search(name: &str) -> String {
+    name.nfd()
+        .filter(|c| !unicode_normalization::char::is_combining_mark(*c))
+        .collect::<String>()
+        .to_lowercase()
+}
+
+pub fn build_name_search_index(catalog: &Catalog) -> NameSearchIndex {
+    let by_family = catalog
+        .families
+        .iter()
+        .map(|family| {
+            family
+                .name
+                .values()
+                .map(|name| normalize_name_for_search(name))
+                .collect()
+        })
+        .collect();
+    NameSearchIndex { by_family }
+}
+
 /// Eagerly load the full merged index directory into memory.
 pub fn load_index(index_dir: &Path) -> Result<AppState> {
     let index_dir = index_dir
@@ -155,6 +203,12 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         }
     );
 
+    let name_search_index = build_name_search_index(&catalog);
+    eprintln!(
+        "  name search index: {} families",
+        name_search_index.by_family().len()
+    );
+
     let effects_list = build_effects_list(&idgd_catalog);
     let effects_body = Arc::new(serialize_effects_list(&effects_list)?);
     eprintln!(
@@ -180,6 +234,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         stats,
         factions,
         set_bitmaps,
+        name_search_index,
         effects_body,
     })))
 }
@@ -318,4 +373,19 @@ fn load_factions(index_dir: &Path, summary: &FactionsSummary) -> Result<BTreeMap
     }
 
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_name_for_search_folds_diacritics_and_lowercases() {
+        assert_eq!(normalize_name_for_search("Élémentaire"), "elementaire");
+        assert_eq!(normalize_name_for_search("elementaire"), "elementaire");
+        assert_eq!(
+            normalize_name_for_search("Élémentaire de Kélon"),
+            "elementaire de kelon"
+        );
+    }
 }

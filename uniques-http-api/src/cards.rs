@@ -159,6 +159,7 @@ struct CardsRequest {
     sets: Vec<String>,
     main_cost: Option<CostPredicate>,
     recall_cost: Option<CostPredicate>,
+    name: Option<String>,
     debug_bga_trigram: bool,
 }
 
@@ -244,6 +245,7 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
     }
     let main_cost = parse_cost_predicate(params, "mainCost")?;
     let recall_cost = parse_cost_predicate(params, "recallCost")?;
+    let name = parse_name(params);
     let debug_bga_trigram = params.contains_key("debug_bga_trigram");
 
     validate_idgd_types(state, &filters)?;
@@ -256,8 +258,19 @@ fn parse_request(state: &AppState, params: &QueryMultiMap) -> ApiResult<CardsReq
         sets,
         main_cost,
         recall_cost,
+        name,
         debug_bga_trigram,
     })
+}
+
+fn parse_name(params: &QueryMultiMap) -> Option<String> {
+    let raw = get_first(params, "name")?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn parse_id_list(params: &QueryMultiMap, key: &str) -> ApiResult<Vec<u32>> {
@@ -671,6 +684,10 @@ fn build_bitmap(state: &AppState, req: &CardsRequest) -> ApiResult<RoaringBitmap
         )?);
     }
 
+    if let Some(name) = &req.name {
+        groups.push(state.name_search_index().bitmap_for_contains(state.catalog(), name));
+    }
+
     let mut it = groups.into_iter();
     let mut out = match it.next() {
         Some(first) => first,
@@ -1056,7 +1073,7 @@ mod tests {
     use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
     use alt_indexer::stat_index::StatField;
 
-    use crate::loader::{build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS};
+    use crate::loader::{build_name_search_index, build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS};
     use crate::state::AppStateInner;
 
     fn test_state() -> AppState {
@@ -1072,7 +1089,10 @@ mod tests {
                 max_unique_id: 10,
                 card_count: 10,
                 first_reference: "ALT_TEST_B_AX_01_U_1".to_string(),
-                name: BTreeMap::from([("en_US".to_string(), "Test Card".to_string())]),
+                name: BTreeMap::from([
+                    ("en_US".to_string(), "Test Card".to_string()),
+                    ("fr_FR".to_string(), "Élémentaire de Kélon".to_string()),
+                ]),
                 artist: "Test Artist".to_string(),
                 card_sub_types: vec![FamilyCardSubType {
                     reference: "ENGINEER".to_string(),
@@ -1201,6 +1221,7 @@ mod tests {
         let effects_list = crate::effects::build_effects_list(&idgd_catalog);
         let effects_body = Arc::new(crate::effects::serialize_effects_list(&effects_list).unwrap());
         let set_bitmaps = build_set_bitmaps(&catalog);
+        let name_search_index = build_name_search_index(&catalog);
 
         let inner = AppStateInner {
             index_dir: "C:\\tmp\\index".into(),
@@ -1234,6 +1255,7 @@ mod tests {
                 factions
             },
             set_bitmaps,
+            name_search_index,
         };
 
         AppState::new(Arc::new(inner))
@@ -1243,6 +1265,7 @@ mod tests {
         start_bit: u32,
         source_set: &str,
         family_number: &str,
+        name: &str,
     ) -> FamilyEntry {
         FamilyEntry {
             start_bit,
@@ -1253,7 +1276,7 @@ mod tests {
             max_unique_id: 5,
             card_count: 5,
             first_reference: format!("ALT_{source_set}_B_AX_{family_number}_U_1"),
-            name: BTreeMap::from([("en_US".to_string(), "Test".to_string())]),
+            name: BTreeMap::from([("en_US".to_string(), name.to_string())]),
             artist: "Test".to_string(),
             card_sub_types: vec![],
             set: FamilySet {
@@ -1269,9 +1292,9 @@ mod tests {
             set: "ALL_SETS".to_string(),
             faction_order: FACTION_ORDER.iter().map(|s| s.to_string()).collect(),
             families: vec![
-                family_entry(0, SET_CORE, "01"),
-                family_entry(5, SET_COREKS, "01"),
-                family_entry(10, "ALIZE", "01"),
+                family_entry(0, SET_CORE, "01", "Kelon Elemental"),
+                family_entry(5, SET_COREKS, "01", "Kelon Elemental"),
+                family_entry(10, "ALIZE", "01", "Other Character"),
             ],
             total_bit_span: 15,
         };
@@ -1288,6 +1311,7 @@ mod tests {
         };
 
         let set_bitmaps = build_set_bitmaps(&catalog);
+        let name_search_index = build_name_search_index(&catalog);
         assert!(set_bitmaps.by_set.contains_key(SET_CORE));
         assert!(set_bitmaps.by_set.contains_key(SET_COREKS));
         assert!(set_bitmaps.by_set.contains_key("ALIZE"));
@@ -1323,6 +1347,7 @@ mod tests {
             stats: BTreeMap::new(),
             factions: BTreeMap::new(),
             set_bitmaps,
+            name_search_index,
         };
 
         AppState::new(Arc::new(inner))
@@ -1519,6 +1544,90 @@ mod tests {
         for i in 10..15 {
             assert!(bmp.contains(i));
         }
+    }
+
+    #[test]
+    fn empty_name_treated_as_no_filter() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["   ".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        assert!(req.name.is_none());
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), state.manifest().total_bit_span as u64);
+    }
+
+    #[test]
+    fn name_contains_case_insensitive() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["test card".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), 10);
+    }
+
+    #[test]
+    fn name_matches_any_locale() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["kelon".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), 10);
+    }
+
+    #[test]
+    fn name_folds_unicode_diacritics() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["elementaire".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(
+            bmp.len(),
+            10,
+            "elementaire should match fr_FR Élémentaire de Kélon"
+        );
+    }
+
+    #[test]
+    fn name_no_match_returns_empty_bitmap() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["zzzzz".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert!(bmp.is_empty());
+    }
+
+    #[test]
+    fn name_only_query_without_other_filters() {
+        let state = test_state_with_sets();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["Kelon".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), 10);
+        for i in 0..10 {
+            assert!(bmp.contains(i));
+        }
+        assert!(!bmp.contains(10));
+    }
+
+    #[test]
+    fn name_combined_with_set_filter() {
+        let state = test_state_with_sets();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("name".to_string(), vec!["Kelon".to_string()]);
+        params.insert("set[]".to_string(), vec!["CORE".to_string()]);
+        let req = parse_request(&state, &params).unwrap();
+        let bmp = build_bitmap(&state, &req).unwrap();
+        assert_eq!(bmp.len(), 5);
+        for i in 0..5 {
+            assert!(bmp.contains(i));
+        }
+        assert!(!bmp.contains(5));
     }
 
     #[test]

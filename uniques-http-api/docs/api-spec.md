@@ -4,37 +4,44 @@
 
 ### Core filters
 
-| Supported | Parameter | Type / Encoding | Example | Meaning |
-|---|---|---|---|---|
-| Yes | `set[]` | repeated array | `set[]=CORE` | Filter by one or more source set codes (e.g. `CORE`, `COREKS`). Alias: `set=CORE,COREKS` (CSV). OR within listed sets; AND with other filters. |
-| Yes | `faction[]` | repeated array | `faction[]=AX` | Filter by one or more faction codes. |
+
+| Supported | Parameter   | Type / Encoding | Example        | Meaning                                                                                                                                                                                                                                  |
+| --------- | ----------- | --------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Yes       | `set[]`     | repeated array  | `set[]=CORE`   | Filter by one or more source set codes (e.g. `CORE`, `COREKS`). Alias: `set=CORE,COREKS` (CSV). OR within listed sets; AND with other filters.                                                                                           |
+| Yes       | `faction[]` | repeated array  | `faction[]=AX` | Filter by one or more faction codes.                                                                                                                                                                                                     |
+| Yes       | `name`      | string          | `name=Kelon`   | Case-insensitive substring match on character name (any locale). Accented characters match unaccented queries (e.g. `elementaire` matches `Élémentaire`, `boshi` matches `Issun-bōshi`). Whitespace-only values are ignored (no filter). |
+
 
 ### Numeric and stat filters
 
-| Supported | Parameter | Type / Encoding | Example | Meaning |
-|---|---|---|---|---|
-| Yes | `mainCost` | exact integer | `mainCost=3` | Exact main cost. |
-| Yes | `mainCost[gt]` / `mainCost[gte]` / `mainCost[lt]` / `mainCost[lte]` | ranged integer | `mainCost[gte]=3` | Main cost greater/less than comparisons. |
-| Yes | `mainCost[]` | repeated array | `mainCost[]=2&mainCost[]=3` | Match any of several exact values. |
-| Yes | `recallCost` / `recallCost[...]` / `recallCost[]` | integer or ranged/array | `recallCost[lte]=1` | Recall cost filter. |
-| No  | `oceanPower` / `oceanPower[...]` / `oceanPower[]` | integer or ranged/array | `oceanPower[]=0&oceanPower[]=1` | Ocean power filter. |
-| No  | `mountainPower` / `mountainPower[...]` / `mountainPower[]` | integer or ranged/array | `mountainPower[gt]=5` | Mountain power filter. |
-| No  | `forestPower` / `forestPower[...]` / `forestPower[]` | integer or ranged/array | `forestPower=2` | Forest power filter. |
+
+| Supported | Parameter                                                           | Type / Encoding         | Example                         | Meaning                                  |
+| --------- | ------------------------------------------------------------------- | ----------------------- | ------------------------------- | ---------------------------------------- |
+| Yes       | `mainCost`                                                          | exact integer           | `mainCost=3`                    | Exact main cost.                         |
+| Yes       | `mainCost[gt]` / `mainCost[gte]` / `mainCost[lt]` / `mainCost[lte]` | ranged integer          | `mainCost[gte]=3`               | Main cost greater/less than comparisons. |
+| Yes       | `mainCost[]`                                                        | repeated array          | `mainCost[]=2&mainCost[]=3`     | Match any of several exact values.       |
+| Yes       | `recallCost` / `recallCost[...]` / `recallCost[]`                   | integer or ranged/array | `recallCost[lte]=1`             | Recall cost filter.                      |
+| No        | `oceanPower` / `oceanPower[...]` / `oceanPower[]`                   | integer or ranged/array | `oceanPower[]=0&oceanPower[]=1` | Ocean power filter.                      |
+| No        | `mountainPower` / `mountainPower[...]` / `mountainPower[]`          | integer or ranged/array | `mountainPower[gt]=5`           | Mountain power filter.                   |
+| No        | `forestPower` / `forestPower[...]` / `forestPower[]`                | integer or ranged/array | `forestPower=2`                 | Forest power filter.                     |
+
 
 ### Effect filters
 
-| Supported | Parameter | Type / Encoding | Example | Meaning |
-|---|---|---|---|---|
-| Yes | `effect[0][t]` | integer id or comma-separated list | `5`, `1,5,12` | Ability trigger idGd for slot 0. |
-| Yes | `effect[0][c]` | integer id or comma-separated list | `3`, `3,16,199` | Ability condition idGd for slot 0. |
-| Yes | `effect[0][o]` | integer id or comma-separated list | `42`, `42,94,601` | Ability output idGd for slot 0. |
-| Yes | `effect[1][t]` | integer id or comma-separated list | `24` | Ability trigger idGd for slot 1. |
-| Yes | `effect[1][c]` | integer id or comma-separated list | `191` | Ability condition idGd for slot 1. |
-| Yes | `effect[1][o]` | integer id or comma-separated list | `90` | Ability output idGd for slot 1. |
-| Yes | `effectMode` | enum | `and`, `or` |
-| Yes | `support[t]` | integer id or comma-separated list | `support[t]=24` | Ability trigger idGd for support effect. |
-| Yes | `support[c]` | integer id or comma-separated list | `support[c]=191` | Ability condition idGd for support effect. |
-| Yes | `support[o]` | integer id or comma-separated list | `support[o]=90` | Ability output idGd for support effect. |
+
+| Supported | Parameter      | Type / Encoding                    | Example           | Meaning                                    |
+| --------- | -------------- | ---------------------------------- | ----------------- | ------------------------------------------ |
+| Yes       | `effect[0][t]` | integer id or comma-separated list | `5`, `1,5,12`     | Ability trigger idGd for slot 0.           |
+| Yes       | `effect[0][c]` | integer id or comma-separated list | `3`, `3,16,199`   | Ability condition idGd for slot 0.         |
+| Yes       | `effect[0][o]` | integer id or comma-separated list | `42`, `42,94,601` | Ability output idGd for slot 0.            |
+| Yes       | `effect[1][t]` | integer id or comma-separated list | `24`              | Ability trigger idGd for slot 1.           |
+| Yes       | `effect[1][c]` | integer id or comma-separated list | `191`             | Ability condition idGd for slot 1.         |
+| Yes       | `effect[1][o]` | integer id or comma-separated list | `90`              | Ability output idGd for slot 1.            |
+| Yes       | `effectMode`   | enum                               | `and`, `or`       |                                            |
+| Yes       | `support[t]`   | integer id or comma-separated list | `support[t]=24`   | Ability trigger idGd for support effect.   |
+| Yes       | `support[c]`   | integer id or comma-separated list | `support[c]=191`  | Ability condition idGd for support effect. |
+| Yes       | `support[o]`   | integer id or comma-separated list | `support[o]=90`   | Ability output idGd for support effect.    |
+
 
 If multiple values are specified for a trigger, condition or output, a predicate is created that matches ANY of these values (OR).
 If multiple effects are specified, the `effectMode` determines if the card must match at least one of them (`or`) or all of them (`and`).
@@ -100,7 +107,6 @@ The response is a JSON files which includes the total number of matches, a page 
   ]
 }
 ```
-
 
 ## GET `/api/v2/effects` Response
 

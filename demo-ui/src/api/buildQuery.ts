@@ -90,6 +90,11 @@ export function buildQuery(
     params.append('set[]', set);
   }
 
+  const name = state.name.trim();
+  if (name) {
+    params.set('name', name);
+  }
+
   if (state.handCost.trim()) {
     const parsed = parseCostInput(state.handCost);
     if (!parsed.ok) {
