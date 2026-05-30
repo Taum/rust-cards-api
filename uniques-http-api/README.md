@@ -64,5 +64,5 @@ curl "$SERVICE_URL/health"
 
 ## API
 
-See [`docs/api-spec.md`](docs/api-spec.md).
+See [API spec](../docs/api-spec.md).
 

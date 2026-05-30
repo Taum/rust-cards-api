@@ -7,7 +7,7 @@ effect combobox, return only the idGds for that box that would still yield an ab
 exists, given the other boxes already set in that same group plus the rest of the current filters.
 Presence-only, ids-only. Target latency: a few ms (well under 100 ms).
 
-The existing static [`GET /api/v2/effects`](../docs/api-spec.md) (all triggers/conditions/outputs
+The existing static [`GET /api/v2/effects`](../../docs/api-spec.md) (all triggers/conditions/outputs
 with localized text) stays as-is and is used for the initial combobox population; the new endpoint
 only narrows one box. No `alt-indexer` changes.
 
@@ -127,7 +127,7 @@ use as `Base`.
 Add `.route("/api/v2/effects/filtered", get(effects_filtered::get_effects_filtered))`. Leave
 `/api/v2/effects` untouched.
 
-### 4. Docs — [`docs/api-spec.md`](../docs/api-spec.md)
+### 4. Docs — [`docs/api-spec.md`](../../docs/api-spec.md)
 
 Add a section for `GET /api/v2/effects/filtered`: the `editing=<part>:<slot>` param, that the client
 sends its full filter state, that the server excludes the edited group (by index) from the search

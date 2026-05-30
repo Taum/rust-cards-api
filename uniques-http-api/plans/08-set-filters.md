@@ -59,7 +59,7 @@ Filter by **source set codes** (not product codes like `BTG`).
 | `set=CORE,COREKS` | CSV alias (same pattern as `faction=`) |
 | unknown code | `400` |
 
-Document in [`docs/api-spec.md`](../docs/api-spec.md).
+Document in [`docs/api-spec.md`](../../docs/api-spec.md).
 
 ### Implementation outline
 

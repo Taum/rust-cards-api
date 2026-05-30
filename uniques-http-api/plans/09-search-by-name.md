@@ -61,7 +61,7 @@ The same `family_id` can appear in multiple sets as separate catalog rows (e.g. 
 | no match                   | Empty result set (`total: 0`)                                   |
 
 
-Document in `[docs/api-spec.md](../docs/api-spec.md)`.
+Document in `[docs/api-spec.md](../../docs/api-spec.md)`.
 
 ### Implementation outline
 

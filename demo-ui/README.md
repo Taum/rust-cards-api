@@ -1,6 +1,6 @@
 # Cards API demo UI
 
-Simple React demo for [`GET /api/v2/cards`](../uniques-http-api/docs/api-spec.md).
+Simple React demo for [`GET /api/v2/cards`](../docs/api-spec.md).
 
 See [plans/01-initial-version.md](plans/01-initial-version.md) for scope and filter syntax. See [plans/03-github-pages.md](plans/03-github-pages.md) for GitHub Pages deployment.
 

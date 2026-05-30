@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add `GET /api/v2/effects` so clients can populate effect filter picklists (trigger / condition / output idGd values with localized text). The response shape is defined in [`docs/api-spec.md`](../docs/api-spec.md).
+Add `GET /api/v2/effects` so clients can populate effect filter picklists (trigger / condition / output idGd values with localized text). The response shape is defined in [`docs/api-spec.md`](../../docs/api-spec.md).
 
 The endpoint takes no query parameters and returns a **static JSON body** built once at startup from `idgd_catalog.json`.
 

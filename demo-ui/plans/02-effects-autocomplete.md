@@ -6,7 +6,7 @@ Load `GET /api/v2/effects` at startup and replace plain idGd text inputs with au
 
 ## API
 
-- Endpoint: `GET /api/v2/effects` ([`uniques-http-api/docs/api-spec.md`](../../uniques-http-api/docs/api-spec.md))
+- Endpoint: `GET /api/v2/effects` ([`docs/api-spec.md`](../../docs/api-spec.md))
 - Response: `{ triggers, conditions, output }` with `idGd`, locale `text` maps, `isEcho` / `isMain` on trigger/condition rows
 - Dev proxy: `/api` → `http://127.0.0.1:8234` in [`vite.config.ts`](../vite.config.ts)
 

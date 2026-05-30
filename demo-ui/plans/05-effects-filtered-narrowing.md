@@ -4,7 +4,7 @@
 
 Make each effect combobox narrow its suggestions in real time as filters are added. When a
 trigger/condition/output box is focused, call the new
-[`GET /api/v2/effects/filtered`](../../uniques-http-api/docs/api-spec.md) endpoint with the current
+[`GET /api/v2/effects/filtered`](../../docs/api-spec.md) endpoint with the current
 filter state and `editing=<part>:<slot>`, and restrict that box's dropdown to the returned idGds
 (the effects still reachable in the reduced search space).
 

@@ -26,7 +26,7 @@ Access the demo at https://taum.github.io/rust-cards-api/
 
 - [Architecture overview](docs/architecture.md)
 - [ALL_SETS index format](docs/ALL_SETS-index-format.md)
-- [HTTP API spec](uniques-http-api/docs/api-spec.md)
+- [HTTP API spec](docs/api-spec.md)
 
 ## Getting started
 

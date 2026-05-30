@@ -261,7 +261,7 @@ INDEX_PATH=../alt-indexer/full_index/ALL_SETS
 - Image embeds index at `/opt/index/ALL_SETS` by default.
 - Cloud Run sets `PORT`; override `INDEX_PATH` if the index is mounted elsewhere.
 
-See [uniques-http-api README](../uniques-http-api/README.md) and [API spec](../uniques-http-api/docs/api-spec.md).
+See [uniques-http-api README](../uniques-http-api/README.md) and [API spec](api-spec.md).
 
 ---
 

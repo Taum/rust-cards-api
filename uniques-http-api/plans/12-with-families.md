@@ -62,7 +62,7 @@ Lowest `card_index` in a merged CORE+COREKS span is typically the COREKS print.
 - [`src/loader.rs`](../src/loader.rs) — `FamilySpanGroup`, `build_family_span_groups`
 - [`src/state.rs`](../src/state.rs) — store + accessor
 - [`src/cards.rs`](../src/cards.rs) — parse, `FamilyMatchV2`, `families_from_bitmap`, handler
-- [`docs/api-spec.md`](../docs/api-spec.md) — param + response
+- [`docs/api-spec.md`](../../docs/api-spec.md) — param + response
 
 ### Out of scope
 

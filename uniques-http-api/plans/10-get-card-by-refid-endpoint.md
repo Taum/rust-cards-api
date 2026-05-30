@@ -8,7 +8,7 @@ Expose a single-card lookup endpoint:
 GET /api/v2/card/ALT_CYCLONE_B_BR_77_U_1787
 ```
 
-Response body is a **direct `CardV2` object** (same fields as one element of [`GET /api/v2/cards`](../docs/api-spec.md) `cards[]`), not wrapped in `iter` / `cards`.
+Response body is a **direct `CardV2` object** (same fields as one element of [`GET /api/v2/cards`](../../docs/api-spec.md) `cards[]`), not wrapped in `iter` / `cards`.
 
 **Status:** implemented.
 
@@ -100,7 +100,7 @@ pub async fn get_card_v2(
 ```
 
 - Path param is the full reference string (underscores are fine; no slashes).
-- Optional `?debug_bga_trigram` (same flag behavior as [`get_cards_v2`](../src/cards.rs)); **documented** in [`api-spec.md`](../docs/api-spec.md).
+- Optional `?debug_bga_trigram` (same flag behavior as [`get_cards_v2`](../src/cards.rs)); **documented** in [`api-spec.md`](../../docs/api-spec.md).
 
 ### Loader integration
 
@@ -115,7 +115,7 @@ Wire into `AppStateInner` construction (alongside `name_search_index`).
 
 ### Documentation
 
-Section added to [`docs/api-spec.md`](../docs/api-spec.md):
+Section added to [`docs/api-spec.md`](../../docs/api-spec.md):
 
 - **Route:** `GET /api/v2/card/{reference}`
 - **200:** one `CardV2` object (same example fields as search response card object)

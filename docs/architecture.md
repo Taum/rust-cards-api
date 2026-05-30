@@ -2,7 +2,7 @@
 
 This document explains how **rust-cards-api** is built for someone who has never seen the repository. It focuses on the *why* and the *shape* of the system, not every CLI flag or API parameter.
 
-For on-disk byte layouts and external consumers, see also [ALL_SETS index format](ALL_SETS-index-format.md) and the [HTTP API spec](../uniques-http-api/docs/api-spec.md).
+For on-disk byte layouts and external consumers, see also [ALL_SETS index format](ALL_SETS-index-format.md) and the [HTTP API spec](api-spec.md).
 
 ---
 
@@ -190,5 +190,5 @@ Benchmarks in `alt-indexer bench-query` exercise the same decode path with every
 | Index byte layout & merge semantics | [ALL_SETS-index-format.md](ALL_SETS-index-format.md) |
 | Bitmap indexer design | [01-idgd-bitset-indexer.md](../alt-indexer/plans/01-idgd-bitset-indexer.md) |
 | `cards.bin` record layout | [02-idgd-compact-card-format.md](../alt-indexer/plans/02-idgd-compact-card-format.md) |
-| HTTP API | [api-spec.md](../uniques-http-api/docs/api-spec.md) |
+| HTTP API | [api-spec.md](api-spec.md) |
 | Deploy / Cloud Run | [uniques-http-api README](../uniques-http-api/README.md) |
