@@ -75,6 +75,12 @@ export function AlteredCardSlot({
         className="aspect-[744/1039] w-full overflow-hidden rounded-lg"
         data-card-ref={card.reference}
       />
+      <p
+        className="truncate px-0.5 text-center text-xs leading-tight tracking-tight text-slate-500 [font-family:'Roboto_Condensed','Arial_Narrow','Liberation_Sans_Narrow',ui-sans-serif,sans-serif]"
+        title={card.reference}
+      >
+        {card.reference}
+      </p>
       {showDebugTrigram && (
         <div className="flex items-start gap-1">
           <p className="min-w-0 flex-1 break-all font-mono text-[10px] leading-snug text-slate-400">
