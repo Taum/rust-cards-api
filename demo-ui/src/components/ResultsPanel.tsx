@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CardsQueryState } from '../hooks/useCardsQuery';
 import type { CardLocale } from '../locale';
+import { ResultsScrollContext } from '../context/ResultsScrollContext';
 
 import { CardList } from './CardList';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -31,7 +32,7 @@ export function ResultsPanel({
     loadMore,
   } = query;
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const displayed = cards.length;
@@ -39,9 +40,8 @@ export function ResultsPanel({
   const inFlight = status === 'loading' || loadingMore;
 
   useEffect(() => {
-    const root = scrollRef.current;
     const sentinel = sentinelRef.current;
-    if (!root || !sentinel) {
+    if (!scrollRoot || !sentinel) {
       return;
     }
 
@@ -51,12 +51,12 @@ export function ResultsPanel({
           loadMore();
         }
       },
-      { root, rootMargin: '200px' },
+      { root: scrollRoot, rootMargin: '200px' },
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loadMore, hasMore, status, loadingMore, displayed]);
+  }, [loadMore, hasMore, status, loadingMore, displayed, scrollRoot]);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-4">
@@ -110,19 +110,21 @@ export function ResultsPanel({
       </div>
 
       {(status === 'success' || (status === 'error' && displayed > 0)) && (
-        <div
-          ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2"
-        >
-          <CardList
-            cards={cards}
-            locale={locale}
-            showDebugTrigram={showDebugTrigram}
-            withFamilies={withFamilies}
-            families={query.families}
-          />
-          {hasMore && <div ref={sentinelRef} className="h-1" aria-hidden />}
-        </div>
+        <ResultsScrollContext.Provider value={scrollRoot}>
+          <div
+            ref={setScrollRoot}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-slate-700/60 bg-slate-950/30 p-2"
+          >
+            <CardList
+              cards={cards}
+              locale={locale}
+              showDebugTrigram={showDebugTrigram}
+              withFamilies={withFamilies}
+              families={query.families}
+            />
+            {hasMore && <div ref={sentinelRef} className="h-1" aria-hidden />}
+          </div>
+        </ResultsScrollContext.Provider>
       )}
     </section>
   );

@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { ensureAlteredRenderInit } from '../api/alteredRender';
+import { withAlteredMountSlot } from '../api/alteredMountQueue';
 import { cardToAlteredApiJson } from '../api/cardToAlteredApiJson';
+import { useResultsScrollRoot } from '../context/ResultsScrollContext';
 import type { CardLocale } from '../locale';
 import type { CardV2 } from '../types';
+
+const CARD_SHELL_CLASS =
+  'relative aspect-[744/1039] w-full overflow-hidden rounded-lg bg-slate-900';
+const LAZY_ROOT_MARGIN = '200px';
+
+function clearMountNode(node: HTMLElement): void {
+  node.replaceChildren();
+}
 
 type AlteredCardSlotProps = {
   card: CardV2;
@@ -18,7 +28,13 @@ export function AlteredCardSlot({
   showDebugTrigram,
   caption,
 }: AlteredCardSlotProps) {
-  const slotRef = useRef<HTMLDivElement>(null);
+  const scrollRoot = useResultsScrollRoot();
+  const observeRef = useRef<HTMLDivElement>(null);
+  /** Imperative-only mount target — never put React children here. */
+  const mountRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [mountError, setMountError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const trigramText = card.debug_bga_trigram ?? '';
 
@@ -36,50 +52,108 @@ export function AlteredCardSlot({
   };
 
   useEffect(() => {
-    const slot = slotRef.current;
-    if (!slot) {
+    const target = observeRef.current;
+    if (!target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setVisible(entry.isIntersecting);
+      },
+      {
+        root: scrollRoot,
+        rootMargin: LAZY_ROOT_MARGIN,
+        threshold: 0,
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [scrollRoot]);
+
+  useEffect(() => {
+    if (!visible) {
+      setMounted(false);
+      setMountError(null);
+      const mountEl = mountRef.current;
+      if (mountEl) {
+        clearMountNode(mountEl);
+      }
+      return;
+    }
+
+    const mountEl = mountRef.current;
+    if (!mountEl) {
       return;
     }
 
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
+      setMountError(null);
+      setMounted(false);
+      clearMountNode(mountEl);
+
       try {
-        await ensureAlteredRenderInit();
-        if (cancelled) {
-          return;
+        await withAlteredMountSlot(async () => {
+          if (cancelled) {
+            return;
+          }
+          await ensureAlteredRenderInit();
+          if (cancelled) {
+            return;
+          }
+          const apiJson = cardToAlteredApiJson(card, locale);
+          await window.AlteredRender.mountFromApi(
+            mountEl,
+            apiJson as unknown as Record<string, unknown>,
+          );
+        });
+
+        if (!cancelled) {
+          setMounted(true);
         }
-        const apiJson = cardToAlteredApiJson(card, locale);
-        await window.AlteredRender.mountFromApi(
-          slot,
-          apiJson as unknown as Record<string, unknown>,
-        );
       } catch (err) {
         if (cancelled) {
           return;
         }
+        clearMountNode(mountEl);
         const message = err instanceof Error ? err.message : String(err);
-        slot.textContent = `Could not render card: ${message}`;
+        setMountError(message);
         console.error(err);
       }
     })();
 
     return () => {
       cancelled = true;
-      slot.innerHTML = '';
+      clearMountNode(mountEl);
     };
-  }, [card, locale]);
+  }, [visible, card, locale]);
+
+  const showPlaceholder = visible && !mounted && mountError === null;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div
-        ref={slotRef}
-        className="aspect-[744/1039] w-full overflow-hidden rounded-lg"
-        data-card-ref={card.reference}
-      />
+    <div ref={observeRef} className="flex flex-col gap-1.5">
+      <div className={CARD_SHELL_CLASS} data-card-ref={card.reference}>
+        <div ref={mountRef} className="absolute inset-0 h-full w-full" />
+        {showPlaceholder && (
+          <div
+            className="pointer-events-none absolute inset-0 z-10 rounded-lg border border-slate-700/80 bg-slate-800/90"
+            aria-hidden
+          />
+        )}
+        {mountError !== null && (
+          <p className="absolute inset-0 z-20 flex items-center justify-center p-2 text-center text-xs text-red-400">
+            Could not render card: {mountError}
+          </p>
+        )}
+      </div>
       <p
         className="truncate px-0.5 text-center text-xs leading-tight tracking-tight text-slate-500 [font-family:'Roboto_Condensed','Arial_Narrow','Liberation_Sans_Narrow',ui-sans-serif,sans-serif]"
-        title={caption === card.reference ? card.reference : `${caption} — ${card.reference}`}
+        title={
+          caption === card.reference ? card.reference : `${caption} — ${card.reference}`
+        }
       >
         {caption}
       </p>
