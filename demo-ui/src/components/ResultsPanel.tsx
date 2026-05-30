@@ -9,9 +9,15 @@ type ResultsPanelProps = {
   query: CardsQueryState;
   locale: CardLocale;
   showDebugTrigram: boolean;
+  withFamilies: boolean;
 };
 
-export function ResultsPanel({ query, locale, showDebugTrigram }: ResultsPanelProps) {
+export function ResultsPanel({
+  query,
+  locale,
+  showDebugTrigram,
+  withFamilies,
+}: ResultsPanelProps) {
   const {
     status,
     cards,
@@ -62,17 +68,27 @@ export function ResultsPanel({ query, locale, showDebugTrigram }: ResultsPanelPr
           )}
           {status === 'success' && iter !== null && (
             <span className="text-emerald-300">
-              <strong>{displayed.toLocaleString()}</strong> displayed ·{' '}
-              <strong>{lastPageCount.toLocaleString()}</strong> returned ·{' '}
-              {cursor !== undefined ? (
+              {withFamilies ? (
                 <>
-                  cursor <strong>{cursor.toLocaleString()}</strong>
+                  <strong>{displayed.toLocaleString()}</strong>{' '}
+                  {displayed === 1 ? 'family' : 'families'} ·{' '}
+                  <strong>{iter.total.toLocaleString()}</strong> matching prints
                 </>
               ) : (
-                <>end of results</>
+                <>
+                  <strong>{displayed.toLocaleString()}</strong> displayed ·{' '}
+                  <strong>{lastPageCount.toLocaleString()}</strong> returned ·{' '}
+                  {cursor !== undefined ? (
+                    <>
+                      cursor <strong>{cursor.toLocaleString()}</strong>
+                    </>
+                  ) : (
+                    <>end of results</>
+                  )}
+                  {' '}
+                  · <strong>{iter.total.toLocaleString()}</strong> total matches
+                </>
               )}
-              {' '}
-              · <strong>{iter.total.toLocaleString()}</strong> total matches
               {durationMs !== null && <> · {durationMs.toFixed(1)} ms</>}
             </span>
           )}
@@ -102,6 +118,8 @@ export function ResultsPanel({ query, locale, showDebugTrigram }: ResultsPanelPr
             cards={cards}
             locale={locale}
             showDebugTrigram={showDebugTrigram}
+            withFamilies={withFamilies}
+            families={query.families}
           />
           {hasMore && <div ref={sentinelRef} className="h-1" aria-hidden />}
         </div>

@@ -88,6 +88,7 @@ export default function App() {
             query={query}
             locale={locale}
             showDebugTrigram={filters.debugBgaTrigram}
+            withFamilies={filters.withFamilies}
           />
         </div>
       </main>

@@ -42,6 +42,7 @@ export type FilterState = {
   handCost: string;
   reserveCost: string;
   limit: string;
+  withFamilies: boolean;
   debugBgaTrigram: boolean;
 };
 
@@ -73,6 +74,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   handCost: '',
   reserveCost: '',
   limit: '',
+  withFamilies: false,
   debugBgaTrigram: false,
 };
 
@@ -114,9 +116,17 @@ export type CardV2 = {
   debug_bga_trigram?: string;
 };
 
+export type FamilyMatchV2 = {
+  familyId: string;
+  count: number;
+  reference: string;
+  name: Record<string, string>;
+};
+
 export type CardsResponse = {
   iter: CardsIter;
   cards: CardV2[];
+  families?: FamilyMatchV2[];
 };
 
 export type ApiError = {

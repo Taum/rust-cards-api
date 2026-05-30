@@ -4,7 +4,7 @@ import {
   buildCardByReferenceUrl,
   buildFullUrl,
 } from '../api/buildQuery';
-import type { ApiError, CardV2, CardsIter, FilterState } from '../types';
+import type { ApiError, CardV2, CardsIter, FamilyMatchV2, FilterState } from '../types';
 
 const DEBOUNCE_MS = 300;
 
@@ -13,6 +13,7 @@ export type QueryStatus = 'idle' | 'loading' | 'success' | 'error';
 export type CardsQueryState = {
   status: QueryStatus;
   cards: CardV2[];
+  families: FamilyMatchV2[] | null;
   iter: CardsIter | null;
   error: string | null;
   durationMs: number | null;
@@ -31,6 +32,7 @@ export type CardsQueryState = {
 const initialState: Omit<CardsQueryState, 'loadMore' | 'hasMore'> = {
   status: 'idle',
   cards: [],
+  families: null,
   iter: null,
   error: null,
   durationMs: null,
@@ -81,6 +83,7 @@ async function fetchCardsPage(
   signal: AbortSignal,
 ): Promise<{
   cards: CardV2[];
+  families: FamilyMatchV2[] | null;
   iter: CardsIter;
   durationMs: number;
 }> {
@@ -103,10 +106,12 @@ async function fetchCardsPage(
 
   const data = (await response.json()) as {
     cards: CardV2[];
+    families?: FamilyMatchV2[];
     iter: CardsIter;
   };
   return {
     cards: data.cards,
+    families: data.families ?? null,
     iter: data.iter,
     durationMs,
   };
@@ -177,6 +182,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
             setQueryState({
               status: 'success',
               cards: [card],
+              families: null,
               iter: { total: 1 },
               error: null,
               durationMs,
@@ -244,7 +250,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
 
       void (async () => {
         try {
-          const { cards, iter, durationMs } = await fetchCardsPage(
+          const { cards, families, iter, durationMs } = await fetchCardsPage(
             url,
             controller.signal,
           );
@@ -256,6 +262,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
           setQueryState({
             status: 'success',
             cards,
+            families,
             iter,
             error: null,
             durationMs,
@@ -295,7 +302,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
   }, [serialized, filters]);
 
   const loadMore = useCallback(() => {
-    if (filtersRef.current.reference.trim()) {
+    if (filtersRef.current.reference.trim() || filtersRef.current.withFamilies) {
       return;
     }
 
@@ -326,7 +333,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
 
     void (async () => {
       try {
-        const { cards: pageCards, iter: nextIter, durationMs } =
+        const { cards: pageCards, families: pageFamilies, iter: nextIter, durationMs } =
           await fetchCardsPage(parsed.url!, controller.signal);
 
         if (controller.signal.aborted) {
@@ -337,6 +344,7 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
           ...prev,
           status: 'success',
           cards: [...prev.cards, ...pageCards],
+          families: pageFamilies ?? prev.families,
           iter: nextIter,
           error: null,
           durationMs,
@@ -369,7 +377,9 @@ export function useCardsQuery(filters: FilterState): CardsQueryState {
   }, []);
 
   const hasMore =
-    !filters.reference.trim() && queryState.iter?.cursor !== undefined;
+    !filters.reference.trim() &&
+    !filters.withFamilies &&
+    queryState.iter?.cursor !== undefined;
 
   return {
     ...queryState,

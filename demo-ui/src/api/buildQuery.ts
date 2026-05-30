@@ -167,6 +167,10 @@ export function buildQuery(
   );
   params.set('limit', String(limit));
 
+  if (state.withFamilies && options?.cursor === undefined) {
+    params.set('withFamilies', '');
+  }
+
   if (state.debugBgaTrigram) {
     params.set('debug_bga_trigram', '');
   }

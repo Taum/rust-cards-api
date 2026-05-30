@@ -576,7 +576,37 @@ export function EffectIdCombobox({
 
     <div className="relative block text-xs text-slate-400">
 
-      <span className="mb-1 block">{label}</span>
+      <span className="mb-1 block">
+
+        {label}
+
+        {narrowingActive && (
+
+          <span
+
+            className={`ml-1.5 ${
+
+              noneAvailable ? 'text-amber-400' : 'text-slate-500'
+
+            }`}
+
+          >
+
+            {narrowing
+
+              ? '· narrowing…'
+
+              : noneAvailable
+
+                ? '· none possible'
+
+                : `· ${narrowedOptions.length} possible`}
+
+          </span>
+
+        )}
+
+      </span>
 
       <div ref={anchorRef} className="relative">
 
@@ -673,32 +703,6 @@ export function EffectIdCombobox({
         )}
 
       </div>
-
-      {narrowingActive && (
-
-        <span
-
-          className={`mt-1 block text-[11px] ${
-
-            noneAvailable ? 'text-amber-400' : 'text-slate-500'
-
-          }`}
-
-        >
-
-          {narrowing
-
-            ? 'Narrowing…'
-
-            : noneAvailable
-
-              ? 'No effects possible with current filters'
-
-              : `${narrowedOptions.length} possible`}
-
-        </span>
-
-      )}
 
       {listbox && createPortal(listbox, document.body)}
 

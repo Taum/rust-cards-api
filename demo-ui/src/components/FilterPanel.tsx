@@ -288,6 +288,23 @@ export function FilterPanel({
       </section>
 
       <section className="border-t border-slate-800 pt-4">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            checked={filters.withFamilies}
+            onChange={(e) => setFilters({ withFamilies: e.target.checked })}
+            className="rounded border-slate-600 bg-slate-950 text-sky-500 focus:ring-sky-500"
+          />
+          Group by family
+        </label>
+        <p className="mt-1 text-xs text-slate-500">
+          Adds <code className="font-mono text-slate-400">withFamilies</code> on
+          the first request: one card per matching family (full prints use a
+          follow-up without this flag).
+        </p>
+      </section>
+
+      <section className="border-t border-slate-800 pt-4">
         <h3 className="mb-2 text-sm font-medium text-slate-300">Debug</h3>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-200">
           <input

@@ -9,12 +9,14 @@ type AlteredCardSlotProps = {
   card: CardV2;
   locale: CardLocale;
   showDebugTrigram: boolean;
+  caption: string;
 };
 
 export function AlteredCardSlot({
   card,
   locale,
   showDebugTrigram,
+  caption,
 }: AlteredCardSlotProps) {
   const slotRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -77,9 +79,9 @@ export function AlteredCardSlot({
       />
       <p
         className="truncate px-0.5 text-center text-xs leading-tight tracking-tight text-slate-500 [font-family:'Roboto_Condensed','Arial_Narrow','Liberation_Sans_Narrow',ui-sans-serif,sans-serif]"
-        title={card.reference}
+        title={caption === card.reference ? card.reference : `${caption} — ${card.reference}`}
       >
-        {card.reference}
+        {caption}
       </p>
       {showDebugTrigram && (
         <div className="flex items-start gap-1">
