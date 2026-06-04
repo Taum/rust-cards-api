@@ -142,7 +142,7 @@ pub enum Command {
         #[arg(long)]
         seed: Option<u64>,
         /// Warmup iterations (executed but not recorded).
-        #[arg(long, default_value_t = 200)]
+        #[arg(long, default_value_t = 5)]
         warmup: usize,
         /// Optional machine-readable JSON output path.
         #[arg(long)]
@@ -153,6 +153,12 @@ pub enum Command {
         /// Use whole-card combined bitmaps (`{id}.roar`) instead of per-line sub-indexes.
         #[arg(long, default_value_t = false)]
         whole_card: bool,
+        /// Skip card-decode list ops; still times intersect, count, and window ops.
+        #[arg(long, default_value_t = false)]
+        roaring_only: bool,
+        /// Include per-query cardinality samples in JSON output.
+        #[arg(long, default_value_t = false)]
+        json_samples: bool,
     },
     /// Register a card-list filter built from a refs file on an existing index.
     AddExtraFilter {
@@ -315,6 +321,8 @@ pub fn run() -> Result<()> {
             json_out,
             print_samples,
             whole_card,
+            roaring_only,
+            json_samples,
         } => {
             bench_query::run(
                 &index_dir,
@@ -327,6 +335,8 @@ pub fn run() -> Result<()> {
                     json_out,
                     print_samples,
                     whole_card,
+                    roaring_only,
+                    json_samples,
                 },
             )?;
         }

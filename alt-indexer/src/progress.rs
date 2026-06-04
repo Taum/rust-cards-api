@@ -201,6 +201,52 @@ impl WriteProgress {
     }
 }
 
+/// Progress for non-empty multi-id pack generation in `bench-query`.
+pub struct MultiIdCombinationProgress {
+    bar: Option<ProgressBar>,
+}
+
+impl MultiIdCombinationProgress {
+    pub fn start(total: usize) -> Self {
+        if total == 0 {
+            return Self { bar: None };
+        }
+        let bar = ProgressBar::new(total as u64);
+        bar.set_draw_target(progress_target());
+        bar.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.green} [{bar:30.cyan/blue}] {pos}/{len} multi-id combinations {msg}",
+            )
+            .expect("bench multi-id progress template")
+            .progress_chars("█▓▒░  "),
+        );
+        bar.set_message("");
+        Self { bar: Some(bar) }
+    }
+
+    pub fn inc(&self, pack_restarts: u64) {
+        let Some(bar) = &self.bar else {
+            return;
+        };
+        bar.inc(1);
+        if pack_restarts > 0 {
+            bar.set_message(format!("({pack_restarts} pack restarts so far)"));
+        }
+    }
+
+    pub fn finish(self, elapsed: Duration, generated: usize, pack_restarts: u64) {
+        let msg = format!(
+            "Generated {generated} multi-id combinations in {:.3}s ({pack_restarts} pack restarts)",
+            elapsed.as_secs_f64()
+        );
+        match self.bar {
+            Some(bar) => bar.finish_with_message(msg),
+            None if generated > 0 => eprintln!("{msg}"),
+            None => {}
+        }
+    }
+}
+
 pub fn progress_enabled() -> bool {
     std::io::IsTerminal::is_terminal(&std::io::stderr())
 }

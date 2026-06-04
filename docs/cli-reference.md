@@ -235,25 +235,32 @@ Benchmark random idGd queries against an index. Preloads bitmaps and `cards.bin`
 | `--index-dir <PATH>` | yes | — | Parent of set folders |
 | `--set <NAME>` | yes | — | Set or merged folder name |
 | `--queries <N>` | no | `5000` | Number of **timed** queries |
-| `--warmup <N>` | no | `200` | Warmup iterations (not recorded) |
+| `--warmup <N>` | no | `5` | Warmup iterations (not recorded) |
 | `--multi-ids <MIN-MAX>` | no | — | Multi-id mode: pick random **K** ids per query with `MIN ≤ K ≤ MAX`, bucket as TRIGGER/CONDITION/OUTPUT, then intersect unions (e.g. `6-12`) |
 | `--seed <U64>` | no | random | RNG seed; if omitted, a time-based seed is chosen and printed in the report |
 | `--json-out <PATH>` | no | — | Write machine-readable benchmark JSON |
 | `--print-samples <N>` | no | — | Print first **N** sampled queries (debug; adds I/O noise) |
 | `--whole-card` | no | `false` | Use whole-card bitmaps instead of per-line |
+| `--roaring-only` | no | `false` | Skip `first_50` / `offset_10000_50` (no `cards.bin` read); still times intersect, count, window ops |
+| `--json-samples` | no | `false` | Add per-query cardinality / intersect ms to JSON output |
 
 **Modes**
 
-- **Single-id** (default): each timed query picks one id from `idgd_catalog.json` and runs the same intersection logic as `query`.
-- **Multi-id** (`--multi-ids`): each query picks K random catalog ids, splits into buckets, intersects unions.
+- **Single-id** (default): each timed query picks one id from the non-empty pool and runs the same intersection logic as `query`.
+- **Multi-id** (`--multi-ids`): each query picks K ids with incremental non-empty sampling (viability matches production `/effects/filtered` — no zero-card results).
 
-Reports latency stats for: **count** (`bitmap.len()`), **first_50** (decode 50 cards from the start of the bitmap), and **offset_10000_50** (skip 10 000 or take last 50, then decode).
+**Timed ops** (in report order): **sample_combinations** (multi-id only — non-empty pack generation), **intersect**, **count**, **first_50**, **offset_10000_50** (skipped with `--roaring-only`), **window_skip**, **window_select**, **window_advance**.
+
+In **multi-id** mode, a progress bar on stderr shows combination generation; the report includes total wall time and per-pack stats for sampling.
+
+Use a **release** build for meaningful timings: `cargo build --release -p alt-indexer`.
 
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- bench-query \
-  --index-dir ./full_index \
+cargo build --release -p alt-indexer
+./alt-indexer/target/release/alt-indexer bench-query \
+  --index-dir ./alt-indexer/full_index \
   --set ALL_SETS \
   --queries 10000 \
   --multi-ids 6-12 \

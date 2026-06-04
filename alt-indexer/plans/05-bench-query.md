@@ -1,7 +1,10 @@
 # Query benchmark tool
 
+See also [12-bench-query-select-profiling.md](./12-bench-query-select-profiling.md) for intersection timing, non-empty sampling, and window/select ops.
+
 ## What we’re benchmarking (per query)
 
+- **Intersect**: `execute_idgd_query_preloaded` (union within T/C/O buckets, intersect groups; per-line OR across lines). Bucket sampling is **not** timed.
 - **Count**: `bitmap.len()`.
 - **First_50**: iterate bitmap values, take 50, and for each bit build a **full card object** by:
   - decoding reference via `Catalog::decode_bit`
@@ -12,6 +15,9 @@
   - if `cardinality >= 10000`, skip 10000 and take 50
   - else start at `max(0, cardinality-50)` and take up to 50
   - and for each bit build the same **full card object** (not just references)
+- **Window_skip / window_select / window_advance**: fetch 50 indices from the result bitmap at rank `10_000` (or last 50) without card decode — compare `iter().skip`, `select` loop, and `select` + `advance_to`.
+
+Multi-id sampling only picks id packs whose intersection is **non-empty** (incremental viability, same intent as `/api/v2/effects/filtered`).
 
 All bitmaps are **preloaded in memory** (no per-query disk I/O timing), per your choice.
 
@@ -123,8 +129,8 @@ If `--json-out` is set:
 ## How you’ll run it
 
 Example:
-- Single-id: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --seed 1 --warmup 200`
-- Multi-id: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --multi-ids 6-12 --seed 1 --warmup 200`
-- Random seed: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --warmup 200`
+- Single-id: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --seed 1 --warmup 5`
+- Multi-id: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --multi-ids 6-12 --seed 1 --warmup 5`
+- Random seed: `alt-indexer bench-query --index-dir <INDEX_ROOT> --set COREKS --queries 5000 --warmup 5`
 
 (Works the same for merged indexes: pass the merged folder name as `--set`.)

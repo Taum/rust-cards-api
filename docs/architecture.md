@@ -178,7 +178,7 @@ Human-readable effect strings are resolved at query time via `idgd_catalog.json`
 4. For each index in the page, decode reference from `catalog`, stats/effects from `cards.bin`, attach display text from catalogs.
 5. Return JSON (`CardsResponse`).
 
-Benchmarks in `alt-indexer bench-query` exercise the same decode path with everything already in RAM; see [bench-query plan](../alt-indexer/plans/05-bench-query.md).
+Benchmarks in `alt-indexer bench-query` time query intersection and optional card decode with everything already in RAM; see [bench-query plans](../alt-indexer/plans/05-bench-query.md) and [select profiling](../alt-indexer/plans/12-bench-query-select-profiling.md).
 
 ---
 
