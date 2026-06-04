@@ -1,9 +1,11 @@
+use crate::add_extra_filter;
 use crate::audit_missing;
 use crate::build;
 use crate::bench_query;
 use crate::decode;
 use crate::merge;
 use crate::query;
+use crate::extra_catalog::ExtraFilterType;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -151,6 +153,27 @@ pub enum Command {
         /// Use whole-card combined bitmaps (`{id}.roar`) instead of per-line sub-indexes.
         #[arg(long, default_value_t = false)]
         whole_card: bool,
+    },
+    /// Register a card-list filter built from a refs file on an existing index.
+    AddExtraFilter {
+        /// Index root containing `catalog.json` and `manifest.json`.
+        #[arg(long)]
+        index_dir: PathBuf,
+        /// Stable filter id (writes `extra/<filter-id>.roar`).
+        #[arg(long)]
+        filter_id: String,
+        /// Text file with one card reference per line.
+        #[arg(long)]
+        refs_file: PathBuf,
+        /// Optional filter category for downstream consumers.
+        #[arg(long)]
+        r#type: Option<ExtraFilterType>,
+        /// Store refs as an exception set (AND NOT at query time).
+        #[arg(long, default_value_t = false)]
+        negated: bool,
+        /// Overwrite an existing filter with the same `--filter-id`.
+        #[arg(long, default_value_t = false)]
+        replace: bool,
     },
 }
 
@@ -306,6 +329,40 @@ pub fn run() -> Result<()> {
                     whole_card,
                 },
             )?;
+        }
+        Command::AddExtraFilter {
+            index_dir,
+            filter_id,
+            refs_file,
+            r#type,
+            negated,
+            replace,
+        } => {
+            let summary = add_extra_filter::add_extra_filter(&add_extra_filter::AddExtraFilterOptions {
+                index_dir,
+                filter_id,
+                refs_file,
+                filter_type: r#type,
+                negated,
+                replace,
+            })?;
+            let verb = if summary.replaced { "replaced" } else { "added" };
+            print!("{verb} extra filter {}", summary.filter_id);
+            if let Some(t) = summary.filter_type {
+                let type_str = match t {
+                    ExtraFilterType::Format => "format",
+                    ExtraFilterType::Property => "property",
+                };
+                print!(" type={type_str}");
+            }
+            println!(
+                " negated={} refs_read={} card_count={} bitmap_bytes={} path={}",
+                summary.negated,
+                summary.refs_read,
+                summary.card_count,
+                summary.bitmap_bytes,
+                summary.bitmap_path.display()
+            );
         }
     }
     Ok(())

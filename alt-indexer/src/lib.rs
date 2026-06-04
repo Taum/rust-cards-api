@@ -1,4 +1,5 @@
 pub mod audit_missing;
+pub mod add_extra_filter;
 pub mod bitmap;
 pub mod build;
 pub mod bench_query;
@@ -13,6 +14,7 @@ pub mod compact;
 pub mod cli;
 pub mod crawl;
 pub mod decode;
+pub mod extra_catalog;
 pub mod idgd_catalog;
 pub mod path;
 pub mod profile;

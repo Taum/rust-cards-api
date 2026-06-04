@@ -172,6 +172,39 @@ See [ALL_SETS index format](ALL_SETS-index-format.md) for merge ordering and on-
 
 ---
 
+### `add-extra-filter`
+
+Register a card-list Roaring filter on an existing index from a refs file.
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `--index-dir <PATH>` | yes | Index root with `catalog.json` and `manifest.json` |
+| `--filter-id <ID>` | yes | Stable filter slug; writes `extra/<filter-id>.roar` |
+| `--refs-file <PATH>` | yes | One card reference per line; blank lines and `#` comments ignored |
+| `--type <format\|property>` | no | Optional filter category stored in `extra_catalog.json` |
+| `--negated` | no | If set, refs are an exception list (`negated: true` in catalog) |
+| `--replace` | no | Overwrite an existing filter with the same `--filter-id` (default: error if id or `.roar` exists) |
+
+**Example**
+
+```bash
+cargo run --manifest-path alt-indexer/Cargo.toml -- add-extra-filter \
+  --index-dir ./full_index/ALL_SETS \
+  --filter-id exclude-banned \
+  --refs-file ./lists/banned.txt \
+  --type property \
+  --negated
+
+# Update the same filter in place
+cargo run --manifest-path alt-indexer/Cargo.toml -- add-extra-filter \
+  --index-dir ./full_index/ALL_SETS \
+  --filter-id exclude-banned \
+  --refs-file ./lists/banned-v2.txt \
+  --replace
+```
+
+---
+
 ### `audit-missing`
 
 Report cards that are allocated in the catalog bit span but missing or invalid in `cards.bin`, focusing on families where `max_unique_id != card_count` (likely gaps).

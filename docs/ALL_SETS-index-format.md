@@ -72,6 +72,9 @@ ALL_SETS/
   manifest.json
   cards.bin
   idgd_catalog.json
+  extra_catalog.json
+  extra/
+    <filter-id>.roar
   id_gd/
     <id_gd>.roar
     <id_gd>_m1.roar
@@ -567,6 +570,34 @@ Cards with unknown or missing `mainFaction.reference` appear in no faction bitma
   "bitmap_dir": "factions"
 }
 ```
+
+---
+
+## `extra_catalog.json`
+
+Optional registry of user-defined card-list filters (see `alt-indexer add-extra-filter`).
+
+```json
+{
+  "version": 1,
+  "set": "ALL_SETS",
+  "entries": [
+    {
+      "id": "exclude-banned",
+      "type": "property",
+      "negated": true,
+      "card_count": 1200,
+      "bitmap_bytes": 4500,
+      "bitmap_file": "extra/exclude-banned.roar"
+    }
+  ]
+}
+```
+
+- **`id`**: stable filter slug; bitmap at `extra/<id>.roar`.
+- **`type`**: optional `"format"` or `"property"` for downstream grouping.
+- **`negated`**: when `true`, the bitmap stores an **exception list** (combine with AND NOT at query time); when `false`, an **include list** (AND).
+- **`card_count` / `bitmap_bytes`**: Roaring cardinality and serialized file size at registration time.
 
 ---
 
