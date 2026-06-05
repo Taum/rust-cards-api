@@ -1,40 +1,13 @@
-mod disk;
-mod source;
-
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::Result;
-use tokio::time::MissedTickBehavior;
 
 use crate::http::state::AppState;
 
-pub use disk::DiskIndexSource;
-pub use source::IndexSource;
+use super::source::IndexSource;
 
-const DEFAULT_RELOAD_INTERVAL_SECS: u64 = 60;
-
-pub fn spawn_hot_reload(state: Arc<AppState>, source: impl IndexSource + 'static) {
-    let interval_secs = std::env::var("INDEX_RELOAD_INTERVAL_SECS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_RELOAD_INTERVAL_SECS);
-
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
-        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-        interval.tick().await;
-
-        loop {
-            interval.tick().await;
-            if let Err(e) = reload_tick(&state, &source).await {
-                eprintln!("index hot-reload tick failed: {e:#}");
-            }
-        }
-    });
-}
-
-async fn reload_tick(
+pub(super) async fn reload_tick(
     state: &AppState,
     source: &(impl IndexSource + Clone + 'static),
 ) -> Result<()> {

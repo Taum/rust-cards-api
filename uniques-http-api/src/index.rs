@@ -1,6 +1,6 @@
 pub mod loader;
 mod query;
-pub mod reload;
+mod reload;
 pub mod uniques_index;
 
 pub use loader::load_index;
