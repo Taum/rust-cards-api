@@ -2,6 +2,9 @@
 
 HTTP API service for querying the merged `ALL_SETS` index.
 
+There is no runtime dependency from `alt-indexer` on the HTTP API. The HTTP crate depends on `alt-indexer` as a **library** for shared types (`Catalog`, `CompactCardView`, `IdGdCatalog`, bitmap helpers, reference parsing, etc.).
+
+
 ## Local development
 
 - **Config**: copy `uniques-http-api/.env.example` to `.env` (optional shared defaults), then create `.env.local` from `.env.local.template` for local overrides.
@@ -65,4 +68,8 @@ curl "$SERVICE_URL/healthz"
 ## API
 
 See [API spec](../docs/api-spec.md).
+
+## Architecture
+
+See [Architecture](./docs/architecture.md)
 
