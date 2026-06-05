@@ -257,8 +257,13 @@ pub fn build_name_search_index(catalog: &Catalog) -> NameSearchIndex {
     NameSearchIndex { by_family }
 }
 
+/// Read only `manifest.json` from an index directory (cheap hot-reload poll step).
+pub fn read_manifest(index_dir: &Path) -> Result<IndexManifest> {
+    load_json(&index_dir.join("manifest.json"))
+}
+
 /// Eagerly load the full merged index directory into memory.
-pub fn load_index(index_dir: &Path) -> Result<AppState> {
+pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
     let index_dir = index_dir
         .canonicalize()
         .with_context(|| format!("resolve index path {}", index_dir.display()))?;
@@ -344,7 +349,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
 
     eprintln!("index load complete");
 
-    Ok(AppState::new(UniquesIndex {
+    Ok(UniquesIndex {
         index_dir,
         catalog,
         manifest,
@@ -361,7 +366,12 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         family_lookup_index,
         family_span_groups,
         effects_body,
-    }))
+    })
+}
+
+/// Load index and wrap in [`AppState`] for Axum.
+pub fn load_index(index_dir: &Path) -> Result<AppState> {
+    Ok(AppState::new(load_uniques_index(index_dir)?))
 }
 
 fn load_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {

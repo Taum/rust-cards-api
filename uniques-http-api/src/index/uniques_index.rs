@@ -146,3 +146,13 @@ impl UniquesIndex {
             })
     }
 }
+
+impl Drop for UniquesIndex {
+    fn drop(&mut self) {
+        eprintln!(
+            "UniquesIndex deallocated (built_at_secs={}, dir={})",
+            self.manifest.built_at_secs,
+            self.index_dir.display(),
+        );
+    }
+}

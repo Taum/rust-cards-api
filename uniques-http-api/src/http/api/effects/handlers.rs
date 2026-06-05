@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use axum::extract::{RawQuery, State};
+use axum::extract::RawQuery;
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -10,25 +8,24 @@ use alt_indexer::bitmap::EffectLine;
 use crate::http::api::cards::parse::{parse_query_multimap, parse_request};
 use crate::http::api::error::{bad_request, ApiResult};
 use crate::index::build_bitmap;
-use crate::http::state::AppState;
+use crate::http::IndexSnapshot;
 
 use super::filtered::{other_two_buckets, parse_editing, union_on_line, MAIN_LINES, SUPPORT_LINES};
 use super::models::{EffectsFilteredResponse, Region};
 
-pub async fn get_effects_v2(State(state): State<Arc<AppState>>) -> Response {
+pub async fn get_effects_v2(IndexSnapshot(index): IndexSnapshot) -> Response {
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/json")],
-        state.index().effects_body().as_ref().clone(),
+        index.effects_body().as_ref().clone(),
     )
         .into_response()
 }
 
 pub async fn get_effects_filtered(
-    State(state): State<Arc<AppState>>,
+    IndexSnapshot(index): IndexSnapshot,
     RawQuery(query): RawQuery,
 ) -> ApiResult<Json<EffectsFilteredResponse>> {
-    let index = state.index();
     let params = parse_query_multimap(query.as_deref())?;
 
     let editing = params
@@ -47,7 +44,7 @@ pub async fn get_effects_filtered(
     let (part, region) = parse_editing(editing)?;
 
     // Full current filter state (validates idGd types, including the edited group).
-    let req = parse_request(index, &params)?;
+    let req = parse_request(&index, &params)?;
 
     // Co-constraints = the edited group's other two boxes (the edited part is ignored).
     let (co1, co2) = match region {
@@ -73,7 +70,7 @@ pub async fn get_effects_filtered(
             base_req.filters.support_o.clear();
         }
     }
-    let base = build_bitmap(index, &base_req).map_err(crate::http::api::error::map_query_error)?;
+    let base = build_bitmap(&index, &base_req).map_err(crate::http::api::error::map_query_error)?;
 
     let lines: &[EffectLine] = match region {
         Region::Main(_) => &MAIN_LINES,
@@ -88,13 +85,13 @@ pub async fn get_effects_filtered(
             break;
         }
         if !co1.is_empty() {
-            pl &= union_on_line(index, line, &co1);
+            pl &= union_on_line(&index, line, &co1);
             if pl.is_empty() {
                 continue;
             }
         }
         if !co2.is_empty() {
-            pl &= union_on_line(index, line, &co2);
+            pl &= union_on_line(&index, line, &co2);
             if pl.is_empty() {
                 continue;
             }

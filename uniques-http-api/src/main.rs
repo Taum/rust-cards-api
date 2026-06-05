@@ -1,9 +1,9 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
 use tokio::net::TcpListener;
-use uniques_http_api::{app, load_env, load_index};
+use uniques_http_api::{app, load_env, load_index, spawn_hot_reload, DiskIndexSource};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -13,6 +13,10 @@ async fn main() -> anyhow::Result<()> {
         .context("INDEX_PATH must point at the merged index directory (e.g. .../ALL_SETS)")?;
 
     let state = Arc::new(load_index(Path::new(&index_path))?);
+    spawn_hot_reload(
+        Arc::clone(&state),
+        DiskIndexSource::new(PathBuf::from(&index_path)),
+    );
     let app = app(state);
 
     let port: u16 = std::env::var("PORT")

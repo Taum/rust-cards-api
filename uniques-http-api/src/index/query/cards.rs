@@ -564,16 +564,17 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["   ".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
         assert!(req.name.is_none());
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), state.index().manifest().total_bit_span as u64);
     }
 
     #[test]
     fn families_from_bitmap_merges_core_coreks_span() {
         let state = test_state_with_sets();
-        let groups = state.index().family_span_groups();
+        let index = state.index();
+        let groups = index.family_span_groups();
         assert_eq!(groups.len(), 2);
         let ax01 = groups.iter().find(|g| g.family_id == "AX_01").unwrap();
         assert_eq!(ax01.range_start, 0);
@@ -583,7 +584,7 @@ mod tests {
         bmp.insert(1);
         bmp.insert(6);
 
-        let (families, ensure) = families_from_bitmap(state.index(), &bmp).unwrap();
+        let (families, ensure) = families_from_bitmap(state.index().as_ref(), &bmp).unwrap();
         assert_eq!(families.len(), 1);
         assert_eq!(families[0].family_id, "AX_01");
         assert_eq!(families[0].count, 2);
@@ -593,7 +594,7 @@ mod tests {
             Some("Kelon Elemental")
         );
 
-        let cards = cards_from_indices(state.index(), &ensure, false).unwrap();
+        let cards = cards_from_indices(state.index().as_ref(), &ensure, false).unwrap();
         assert_eq!(cards.len(), 1);
         assert_eq!(cards[0].reference, families[0].reference);
     }
@@ -606,10 +607,10 @@ mod tests {
         for i in 0..15 {
             bmp.insert(i);
         }
-        let (families, ensure) = families_from_bitmap(state.index(), &bmp).unwrap();
+        let (families, ensure) = families_from_bitmap(state.index().as_ref(), &bmp).unwrap();
         assert_eq!(families.len(), 2);
 
-        let cards = cards_from_indices(state.index(), &ensure, false).unwrap();
+        let cards = cards_from_indices(state.index().as_ref(), &ensure, false).unwrap();
         assert_eq!(cards.len(), families.len());
         for (card, fam) in cards.iter().zip(&families) {
             assert_eq!(card.reference, fam.reference);
@@ -622,8 +623,8 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert!(bmp.contains(2));
         assert!(bmp.contains(5));
         assert_eq!(bmp.len(), 2);
@@ -638,8 +639,8 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("effect[0][o]".to_string(), vec!["42".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert!(bmp.is_empty());
     }
 
@@ -650,8 +651,8 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("support[o]".to_string(), vec!["42".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert!(!bmp.contains(2));
         assert!(bmp.contains(5));
         assert_eq!(bmp.len(), 1);
@@ -664,9 +665,9 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("limit".to_string(), vec!["1".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
-        let (page, _) = page_cards_v2(state.index(), &bmp, None, 1, false).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
+        let (page, _) = page_cards_v2(state.index().as_ref(), &bmp, None, 1, false).unwrap();
         let card = &page[0];
         assert_eq!(card.name.get("en_US").map(String::as_str), Some("Test Card"));
         assert_eq!(card.artist, "Test Artist");
@@ -683,20 +684,20 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("limit".to_string(), vec!["1".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
 
-        let (page1, cur1) = page_cards_v2(state.index(), &bmp, None, 1, false).unwrap();
+        let (page1, cur1) = page_cards_v2(state.index().as_ref(), &bmp, None, 1, false).unwrap();
         assert_eq!(page1.len(), 1);
         assert_eq!(page1[0].reference, "ALT_TEST_B_AX_01_U_3"); // card_index 2 => unique_id 3
         assert_eq!(cur1, Some(2));
 
-        let (page2, cur2) = page_cards_v2(state.index(), &bmp, cur1, 1, false).unwrap();
+        let (page2, cur2) = page_cards_v2(state.index().as_ref(), &bmp, cur1, 1, false).unwrap();
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].reference, "ALT_TEST_B_AX_01_U_6"); // card_index 5 => unique_id 6
         assert_eq!(cur2, Some(5));
 
-        let (page3, cur3) = page_cards_v2(state.index(), &bmp, cur2, 1, false).unwrap();
+        let (page3, cur3) = page_cards_v2(state.index().as_ref(), &bmp, cur2, 1, false).unwrap();
         assert!(page3.is_empty());
         assert_eq!(cur3, None);
     }
@@ -705,7 +706,8 @@ mod tests {
     #[test]
     fn set_filter_uses_combined_core_coreks_bitmap() {
         let state = test_state_with_sets();
-        let bitmaps = state.index().set_bitmaps();
+        let index = state.index();
+        let bitmaps = index.set_bitmaps();
 
         let manual = bitmaps.by_set[SET_CORE].clone() | bitmaps.by_set[SET_COREKS].clone();
         let combined = bitmaps.core_and_coreks.as_ref().unwrap();
@@ -713,15 +715,15 @@ mod tests {
 
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("set[]".to_string(), vec!["CORE".to_string(), "COREKS".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp, *combined);
         assert_eq!(bmp.len(), 10);
 
         let mut single: QueryMultiMap = HashMap::new();
         single.insert("set[]".to_string(), vec!["CORE".to_string()]);
-        let req_single = parse_request(state.index(), &single).unwrap();
-        let bmp_single = build_bitmap(state.index(), &req_single).unwrap();
+        let req_single = parse_request(state.index().as_ref(), &single).unwrap();
+        let bmp_single = build_bitmap(state.index().as_ref(), &req_single).unwrap();
         assert_eq!(bmp_single.len(), 5);
         assert!(bmp_single.contains(0));
         assert!(!bmp_single.contains(5));
@@ -731,8 +733,8 @@ mod tests {
             "set[]".to_string(),
             vec!["CORE".to_string(), "COREKS".to_string(), "ALIZE".to_string()],
         );
-        let req_three = parse_request(state.index(), &three).unwrap();
-        let bmp_three = build_bitmap(state.index(), &req_three).unwrap();
+        let req_three = parse_request(state.index().as_ref(), &three).unwrap();
+        let bmp_three = build_bitmap(state.index().as_ref(), &req_three).unwrap();
         assert_eq!(bmp_three.len(), 15);
     }
 
@@ -742,8 +744,8 @@ mod tests {
         let state = test_state_with_sets();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("set[]".to_string(), vec!["ALIZE".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 5);
         for i in 10..15 {
             assert!(bmp.contains(i));
@@ -756,8 +758,8 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["test card".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 10);
     }
 
@@ -767,8 +769,8 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["kelon".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 10);
     }
 
@@ -778,8 +780,8 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["elementaire".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(
             bmp.len(),
             10,
@@ -793,8 +795,8 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["zzzzz".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert!(bmp.is_empty());
     }
 
@@ -804,8 +806,8 @@ mod tests {
         let state = test_state_with_sets();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["Kelon".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 10);
         for i in 0..10 {
             assert!(bmp.contains(i));
@@ -820,8 +822,8 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("name".to_string(), vec!["Kelon".to_string()]);
         params.insert("set[]".to_string(), vec!["CORE".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 5);
         for i in 0..5 {
             assert!(bmp.contains(i));
@@ -834,8 +836,8 @@ mod tests {
     fn no_filters_returns_all_cards() {
         let state = test_state();
         let params: QueryMultiMap = HashMap::new();
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), state.index().manifest().total_bit_span as u64);
         for i in 0..state.index().manifest().total_bit_span {
             assert!(bmp.contains(i));
@@ -851,8 +853,8 @@ mod tests {
         and_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         and_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
         and_params.insert("effectMode".to_string(), vec!["and".to_string()]);
-        let and_req = parse_request(state.index(), &and_params).unwrap();
-        let and_bmp = build_bitmap(state.index(), &and_req).unwrap();
+        let and_req = parse_request(state.index().as_ref(), &and_params).unwrap();
+        let and_bmp = build_bitmap(state.index().as_ref(), &and_req).unwrap();
         assert!(and_bmp.contains(2));
         assert!(!and_bmp.contains(5));
         assert_eq!(and_bmp.len(), 1);
@@ -861,8 +863,8 @@ mod tests {
         or_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         or_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
         or_params.insert("effectMode".to_string(), vec!["or".to_string()]);
-        let or_req = parse_request(state.index(), &or_params).unwrap();
-        let or_bmp = build_bitmap(state.index(), &or_req).unwrap();
+        let or_req = parse_request(state.index().as_ref(), &or_params).unwrap();
+        let or_bmp = build_bitmap(state.index().as_ref(), &or_req).unwrap();
         assert!(or_bmp.contains(2));
         assert!(or_bmp.contains(5));
         assert_eq!(or_bmp.len(), 2);
@@ -871,9 +873,9 @@ mod tests {
         let mut default_params: QueryMultiMap = HashMap::new();
         default_params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         default_params.insert("effect[1][o]".to_string(), vec!["90".to_string()]);
-        let default_req = parse_request(state.index(), &default_params).unwrap();
+        let default_req = parse_request(state.index().as_ref(), &default_params).unwrap();
         assert_eq!(default_req.filters.effect_mode, EffectCombineMode::And);
-        let default_bmp = build_bitmap(state.index(), &default_req).unwrap();
+        let default_bmp = build_bitmap(state.index().as_ref(), &default_req).unwrap();
         assert_eq!(default_bmp.len(), 1);
         assert!(default_bmp.contains(2));
     }
@@ -889,8 +891,8 @@ mod tests {
         params.insert("faction[]".to_string(), vec!["AX".to_string()]);
         // recallCost==3 is {5}
         params.insert("recallCost".to_string(), vec!["3".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
         assert_eq!(bmp.len(), 1);
         assert!(bmp.contains(5));
     }
@@ -902,12 +904,12 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("limit".to_string(), vec!["1".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
-        let (page, _) = page_cards_v2(state.index(), &bmp, None, 1, true).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
+        let (page, _) = page_cards_v2(state.index().as_ref(), &bmp, None, 1, true).unwrap();
         assert_eq!(page[0].debug_bga_trigram.as_deref(), Some("24/191/90;24/0/42"));
 
-        let (page, _) = page_cards_v2(state.index(), &bmp, None, 1, false).unwrap();
+        let (page, _) = page_cards_v2(state.index().as_ref(), &bmp, None, 1, false).unwrap();
         assert!(page[0].debug_bga_trigram.is_none());
     }
 
@@ -918,9 +920,9 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("limit".to_string(), vec!["1".to_string()]);
-        let req = parse_request(state.index(), &params).unwrap();
-        let bmp = build_bitmap(state.index(), &req).unwrap();
-        let (page, _) = page_cards_v2(state.index(), &bmp, None, 1, true).unwrap();
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
+        let (page, _) = page_cards_v2(state.index().as_ref(), &bmp, None, 1, true).unwrap();
         let json = serde_json::to_value(&page[0]).unwrap();
         assert_eq!(json["debug_bga_trigram"], "24/191/90;24/0/42");
     }
