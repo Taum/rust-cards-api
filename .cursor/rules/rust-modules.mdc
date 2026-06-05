@@ -1,6 +1,6 @@
 ---
 description: "Rules for Rust source code files"
-globs: ["**/*.rs"]
+globs: **/*.rs
 alwaysApply: false
 ---
 ## 
