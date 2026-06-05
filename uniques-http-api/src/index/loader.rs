@@ -15,8 +15,9 @@ use roaring::RoaringBitmap;
 use serde::Deserialize;
 use unicode_normalization::UnicodeNormalization;
 
-use crate::effects::{build_effects_list, serialize_effects_list};
-use crate::state::{AppState, AppStateInner};
+use crate::http::api::effects::{build_effects_list, serialize_effects_list};
+use crate::http::state::AppState;
+use crate::index::UniquesIndex;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct IndexManifest {
@@ -279,7 +280,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
 
     let cards_path = index_dir.join("cards.bin");
     let cards = fs::read(&cards_path).with_context(|| format!("read {}", cards_path.display()))?;
-    let expected_len = AppStateInner::expected_cards_len(catalog.total_bit_span);
+    let expected_len = UniquesIndex::expected_cards_len(catalog.total_bit_span);
     if cards.len() as u64 != expected_len {
         bail!(
             "cards.bin size mismatch: expected {expected_len} bytes (total_bit_span {} * {RECORD_SIZE}), got {}",
@@ -343,7 +344,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
 
     eprintln!("index load complete");
 
-    Ok(AppState::new(Arc::new(AppStateInner {
+    Ok(AppState::new(UniquesIndex {
         index_dir,
         catalog,
         manifest,
@@ -360,7 +361,7 @@ pub fn load_index(index_dir: &Path) -> Result<AppState> {
         family_lookup_index,
         family_span_groups,
         effects_body,
-    })))
+    }))
 }
 
 fn load_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {

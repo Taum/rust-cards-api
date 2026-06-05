@@ -1,33 +1,11 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use alt_indexer::card::LocaleText;
 use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
 use anyhow::Context;
 use axum::body::Bytes;
-use axum::extract::State;
-use axum::http::{header, StatusCode};
-use axum::response::{IntoResponse, Response};
-use serde::Serialize;
 
-use crate::AppState;
-
-/// `GET /api/v2/effects` response body (see `docs/api-spec.md`).
-#[derive(Debug, Clone, Serialize)]
-pub struct EffectsListResponse {
-    pub triggers: Vec<EffectPartWithRegion>,
-    pub conditions: Vec<EffectPartWithRegion>,
-    pub output: Vec<EffectPartWithRegion>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EffectPartWithRegion {
-    pub id_gd: u32,
-    pub text: BTreeMap<String, String>,
-    pub is_echo: bool,
-    pub is_main: bool,
-}
+use super::models::{EffectPartWithRegion, EffectsListResponse};
 
 /// Build the effects list from `idgd_catalog.json` entries.
 pub fn build_effects_list(catalog: &IdGdCatalog) -> EffectsListResponse {
@@ -75,15 +53,6 @@ fn translations_to_text(translations: &BTreeMap<String, LocaleText>) -> BTreeMap
         .iter()
         .map(|(locale, t)| (locale.clone(), t.text.clone()))
         .collect()
-}
-
-pub async fn get_effects_v2(State(state): State<Arc<AppState>>) -> Response {
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/json")],
-        state.effects_body().as_ref().clone(),
-    )
-        .into_response()
 }
 
 #[cfg(test)]

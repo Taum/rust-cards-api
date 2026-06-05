@@ -1,0 +1,19 @@
+---
+description: "Rules for Rust source code files"
+globs: ["**/*.rs"]
+alwaysApply: false
+---
+## 
+
+## File Naming Conventions
+-   Rust source files use the `.rs` extension.
+-   Module files (e.g., `module_a.rs`) should be named after the module they define.
+-   Use snake_case for file names (e.g., `my_module.rs`).
+-   Do **NOT** create `mod.rs` files
+
+### Module Organization
+-   Use modules to organize code into logical units.
+-   Declare modules in `lib.rs` or `main.rs` using the `mod` keyword.
+-   Use `pub mod` to make modules public.
+-   Create separate files for each module to improve readability and maintainability.
+-   Use `use` statements to bring items from other modules into scope.

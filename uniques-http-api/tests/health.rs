@@ -19,7 +19,7 @@ async fn health_returns_hello_world_json() {
     let response = app(test_state())
         .oneshot(
             axum::http::Request::builder()
-                .uri("/health")
+                .uri("/healthz")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -40,7 +40,7 @@ async fn cors_allows_any_origin() {
     let response = app(test_state())
         .oneshot(
             axum::http::Request::builder()
-                .uri("/health")
+                .uri("/healthz")
                 .header(axum::http::header::ORIGIN, "https://example.com")
                 .body(Body::empty())
                 .unwrap(),

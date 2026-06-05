@@ -1,4 +1,5 @@
 ---
+description: "Rules for writing down plans"
 alwaysApply: true
 ---
 - When in plan mode, write down your plan into the plans/ folder of the sub-project being worked on.

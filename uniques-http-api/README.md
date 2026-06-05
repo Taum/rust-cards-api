@@ -18,7 +18,7 @@ cargo run -p uniques-http-api
 Health check:
 
 ```bash
-curl http://127.0.0.1:8234/health
+curl http://127.0.0.1:8234/healthz
 ```
 
 ## Docker / Cloud Run
@@ -59,7 +59,7 @@ gcloud run deploy uniques-http-api \
 Then:
 
 ```bash
-curl "$SERVICE_URL/health"
+curl "$SERVICE_URL/healthz"
 ```
 
 ## API

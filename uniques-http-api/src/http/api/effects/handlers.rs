@@ -1,57 +1,34 @@
 use std::sync::Arc;
 
 use axum::extract::{RawQuery, State};
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
-use roaring::RoaringBitmap;
-use serde::Serialize;
 
 use alt_indexer::bitmap::EffectLine;
 
-use crate::cards::{bad_request, build_bitmap, parse_query_multimap, parse_request, ApiResult};
-use crate::AppState;
+use crate::http::api::cards::parse::{parse_query_multimap, parse_request};
+use crate::http::api::error::{bad_request, ApiResult};
+use crate::index::build_bitmap;
+use crate::http::state::AppState;
 
-/// `GET /api/v2/effects/filtered` response body.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EffectsFilteredResponse {
-    /// Echo of the `editing=<part>:<slot>` request param.
-    pub editing: String,
-    /// idGds of the edited part that still yield an existing ability under the current filters.
-    pub id_gds: Vec<u32>,
+use super::filtered::{other_two_buckets, parse_editing, union_on_line, MAIN_LINES, SUPPORT_LINES};
+use super::models::{EffectsFilteredResponse, Region};
+
+pub async fn get_effects_v2(State(state): State<Arc<AppState>>) -> Response {
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/json")],
+        state.index().effects_body().as_ref().clone(),
+    )
+        .into_response()
 }
-
-#[derive(Debug, Clone, Copy)]
-enum Part {
-    Trigger,
-    Condition,
-    Output,
-}
-
-impl Part {
-    fn element_type(self) -> &'static str {
-        match self {
-            Part::Trigger => "TRIGGER",
-            Part::Condition => "CONDITION",
-            Part::Output => "OUTPUT",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Region {
-    /// A main-effect slot (compacted `effect[N]` index). Searches lines M1/M2/M3.
-    Main(u32),
-    /// The support/echo slot. Searches line Ec.
-    Support,
-}
-
-const MAIN_LINES: [EffectLine; 3] = [EffectLine::M1, EffectLine::M2, EffectLine::M3];
-const SUPPORT_LINES: [EffectLine; 1] = [EffectLine::Ec];
 
 pub async fn get_effects_filtered(
     State(state): State<Arc<AppState>>,
     RawQuery(query): RawQuery,
 ) -> ApiResult<Json<EffectsFilteredResponse>> {
+    let index = state.index();
     let params = parse_query_multimap(query.as_deref())?;
 
     let editing = params
@@ -70,7 +47,7 @@ pub async fn get_effects_filtered(
     let (part, region) = parse_editing(editing)?;
 
     // Full current filter state (validates idGd types, including the edited group).
-    let req = parse_request(&state, &params)?;
+    let req = parse_request(index, &params)?;
 
     // Co-constraints = the edited group's other two boxes (the edited part is ignored).
     let (co1, co2) = match region {
@@ -96,7 +73,7 @@ pub async fn get_effects_filtered(
             base_req.filters.support_o.clear();
         }
     }
-    let base = build_bitmap(&state, &base_req)?;
+    let base = build_bitmap(index, &base_req).map_err(crate::http::api::error::map_query_error)?;
 
     let lines: &[EffectLine] = match region {
         Region::Main(_) => &MAIN_LINES,
@@ -104,20 +81,20 @@ pub async fn get_effects_filtered(
     };
 
     // Per-line partial: Base intersected with the group's other boxes on that same line.
-    let mut partials: Vec<(EffectLine, RoaringBitmap)> = Vec::new();
+    let mut partials = Vec::new();
     for &line in lines {
         let mut pl = base.clone();
         if pl.is_empty() {
             break;
         }
         if !co1.is_empty() {
-            pl &= union_on_line(&state, line, &co1);
+            pl &= union_on_line(index, line, &co1);
             if pl.is_empty() {
                 continue;
             }
         }
         if !co2.is_empty() {
-            pl &= union_on_line(&state, line, &co2);
+            pl &= union_on_line(index, line, &co2);
             if pl.is_empty() {
                 continue;
             }
@@ -130,13 +107,13 @@ pub async fn get_effects_filtered(
     let element_type = part.element_type();
     let mut id_gds: Vec<u32> = Vec::new();
     if !partials.is_empty() {
-        for entry in &state.idgd_catalog().entries {
+        for entry in &index.idgd_catalog().entries {
             if entry.element_type != element_type {
                 continue;
             }
             let id = entry.id_gd;
             for (line, pl) in &partials {
-                if let Some(bm) = state.id_gd_per_line().get(&(id, *line)) {
+                if let Some(bm) = index.id_gd_per_line().get(&(id, *line)) {
                     if !pl.is_disjoint(bm) {
                         id_gds.push(id);
                         break;
@@ -151,56 +128,4 @@ pub async fn get_effects_filtered(
         editing: editing.to_string(),
         id_gds,
     }))
-}
-
-fn parse_editing(editing: &str) -> ApiResult<(Part, Region)> {
-    let (part_str, slot_str) = editing.split_once(':').ok_or_else(|| {
-        bad_request(format!(
-            "invalid editing '{editing}': expected '<part>:<slot>' (e.g. trigger:0)"
-        ))
-    })?;
-
-    let part = match part_str.trim() {
-        "trigger" => Part::Trigger,
-        "condition" => Part::Condition,
-        "output" => Part::Output,
-        other => {
-            return Err(bad_request(format!(
-                "invalid editing part '{other}': expected 'trigger', 'condition', or 'output'"
-            )));
-        }
-    };
-
-    let region = match slot_str.trim() {
-        "support" => Region::Support,
-        s => {
-            let n = s.parse::<u32>().map_err(|_| {
-                bad_request(format!(
-                    "invalid editing slot '{s}': expected a main-effect slot index or 'support'"
-                ))
-            })?;
-            Region::Main(n)
-        }
-    };
-
-    Ok((part, region))
-}
-
-/// Returns clones of the two buckets that are *not* the edited part.
-fn other_two_buckets(part: Part, t: &[u32], c: &[u32], o: &[u32]) -> (Vec<u32>, Vec<u32>) {
-    match part {
-        Part::Trigger => (c.to_vec(), o.to_vec()),
-        Part::Condition => (t.to_vec(), o.to_vec()),
-        Part::Output => (t.to_vec(), c.to_vec()),
-    }
-}
-
-fn union_on_line(state: &AppState, line: EffectLine, ids: &[u32]) -> RoaringBitmap {
-    let mut out = RoaringBitmap::new();
-    for &id in ids {
-        if let Some(bm) = state.id_gd_per_line().get(&(id, line)) {
-            out |= bm;
-        }
-    }
-    out
 }

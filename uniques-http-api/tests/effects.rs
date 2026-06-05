@@ -44,5 +44,5 @@ async fn effects_returns_memoized_catalog_json() {
 
     // Same bytes as startup memoization (stable across requests).
     let state = test_state();
-    assert_eq!(body.as_ref(), state.effects_body().as_ref());
+    assert_eq!(body.as_ref(), state.index().effects_body().as_ref());
 }

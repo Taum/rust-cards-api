@@ -8,23 +8,17 @@ use alt_indexer::catalog::Catalog;
 use alt_indexer::compact::{CompactCardView, RECORD_SIZE};
 use alt_indexer::faction_index::Faction;
 use alt_indexer::idgd_catalog::IdGdCatalog;
+use alt_indexer::path::parse_card_reference;
 use alt_indexer::stat_index::StatField;
 use roaring::RoaringBitmap;
 
-use alt_indexer::path::parse_card_reference;
-
-use crate::loader::{
+use super::loader::{
     FamilyLookupIndex, FamilyResolveError, FamilySpanGroup, FactionsSummary, IndexManifest,
     NameSearchIndex, SetBitmaps, StatsSummary,
 };
 
-/// Shared read-only index data, loaded once at startup and cloned per request via `Arc`.
-#[derive(Clone)]
-pub struct AppState {
-    inner: Arc<AppStateInner>,
-}
-
-pub struct AppStateInner {
+/// In-memory representation of a loaded alt-indexer index directory.
+pub struct UniquesIndex {
     pub index_dir: PathBuf,
     pub catalog: Catalog,
     pub manifest: IndexManifest,
@@ -47,89 +41,94 @@ pub struct AppStateInner {
     pub effects_body: Arc<Bytes>,
 }
 
-impl AppState {
-    pub(crate) fn new(inner: Arc<AppStateInner>) -> Self {
-        Self { inner }
+#[derive(Debug)]
+pub enum CardResolveError {
+    BadRequest { message: String },
+    NotFound { message: String },
+}
+
+impl UniquesIndex {
+    pub fn expected_cards_len(total_bit_span: u32) -> u64 {
+        total_bit_span as u64 * RECORD_SIZE as u64
     }
 
     pub fn index_dir(&self) -> &PathBuf {
-        &self.inner.index_dir
+        &self.index_dir
     }
 
     pub fn catalog(&self) -> &Catalog {
-        &self.inner.catalog
+        &self.catalog
     }
 
     pub fn manifest(&self) -> &IndexManifest {
-        &self.inner.manifest
+        &self.manifest
     }
 
     pub fn idgd_catalog(&self) -> &IdGdCatalog {
-        &self.inner.idgd_catalog
+        &self.idgd_catalog
     }
 
     pub fn stats_summary(&self) -> &StatsSummary {
-        &self.inner.stats_summary
+        &self.stats_summary
     }
 
     pub fn factions_summary(&self) -> &FactionsSummary {
-        &self.inner.factions_summary
+        &self.factions_summary
     }
 
     pub fn cards(&self) -> &[u8] {
-        &self.inner.cards
+        &self.cards
     }
 
     pub fn id_gd_whole(&self) -> &BTreeMap<u32, RoaringBitmap> {
-        &self.inner.id_gd_whole
+        &self.id_gd_whole
     }
 
     pub fn id_gd_per_line(&self) -> &BTreeMap<(u32, EffectLine), RoaringBitmap> {
-        &self.inner.id_gd_per_line
+        &self.id_gd_per_line
     }
 
     pub fn stats(&self) -> &BTreeMap<StatField, [RoaringBitmap; 16]> {
-        &self.inner.stats
+        &self.stats
     }
 
     pub fn factions(&self) -> &BTreeMap<Faction, RoaringBitmap> {
-        &self.inner.factions
+        &self.factions
     }
 
     pub fn set_bitmaps(&self) -> &SetBitmaps {
-        &self.inner.set_bitmaps
+        &self.set_bitmaps
     }
 
     pub fn name_search_index(&self) -> &NameSearchIndex {
-        &self.inner.name_search_index
+        &self.name_search_index
     }
 
     pub fn family_lookup_index(&self) -> &FamilyLookupIndex {
-        &self.inner.family_lookup_index
+        &self.family_lookup_index
     }
 
     pub fn family_span_groups(&self) -> &[FamilySpanGroup] {
-        &self.inner.family_span_groups
+        &self.family_span_groups
     }
 
     pub fn effects_body(&self) -> &Arc<Bytes> {
-        &self.inner.effects_body
+        &self.effects_body
     }
 
     pub fn card_view(&self, card_index: u32) -> Option<CompactCardView<'_>> {
-        CompactCardView::from_data(&self.inner.cards, card_index)
+        CompactCardView::from_data(&self.cards, card_index)
     }
 
     pub fn decode_reference(&self, card_index: u32) -> anyhow::Result<String> {
-        Ok(self.inner.catalog.decode_bit(card_index)?.reference)
+        Ok(self.catalog.decode_bit(card_index)?.reference)
     }
 
     pub fn resolve_card_index(&self, reference: &str) -> Result<u32, CardResolveError> {
         let parsed = parse_card_reference(reference).map_err(|e| CardResolveError::BadRequest {
             message: e.to_string(),
         })?;
-        self.inner
-            .family_lookup_index
+        self.family_lookup_index
             .resolve(&parsed)
             .map_err(|e| match e {
                 FamilyResolveError::NotFound => CardResolveError::NotFound {
@@ -139,24 +138,11 @@ impl AppState {
                     message: format!(
                         "reference {} falls in padding (max UniqueID {})",
                         parsed.reference(),
-                        self.inner
-                            .family_lookup_index
+                        self.family_lookup_index
                             .max_unique_id(&parsed)
                             .unwrap_or(0)
                     ),
                 },
             })
-    }
-}
-
-#[derive(Debug)]
-pub enum CardResolveError {
-    BadRequest { message: String },
-    NotFound { message: String },
-}
-
-impl AppStateInner {
-    pub fn expected_cards_len(total_bit_span: u32) -> u64 {
-        total_bit_span as u64 * RECORD_SIZE as u64
     }
 }
