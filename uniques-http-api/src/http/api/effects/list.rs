@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use alt_indexer::card::LocaleText;
-use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
+use index_core::card::LocaleText;
+use index_core::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
 use anyhow::Context;
 use axum::body::Bytes;
 
@@ -58,7 +58,7 @@ fn translations_to_text(translations: &BTreeMap<String, LocaleText>) -> BTreeMap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alt_indexer::idgd_catalog::IdGdCatalogEntry;
+    use index_core::idgd_catalog::IdGdCatalogEntry;
 
     fn locale_text(locale: &str, text: &str) -> LocaleText {
         LocaleText {

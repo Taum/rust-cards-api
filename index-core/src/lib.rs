@@ -1,25 +1,23 @@
-pub mod audit_missing;
 pub mod add_extra_filter;
+pub mod audit_missing;
 pub mod bitmap;
 pub mod build;
-pub mod bench_query;
 pub mod card;
 pub mod catalog;
-pub mod faction_display;
-pub mod set_code;
-
-pub use faction_display::faction_display_name;
-pub use set_code::set_code;
 pub mod compact;
-pub mod cli;
 pub mod crawl;
 pub mod decode;
 pub mod extra_catalog;
+pub mod faction_display;
+pub mod faction_index;
 pub mod idgd_catalog;
+pub mod merge;
 pub mod path;
 pub mod profile;
 pub mod progress;
 pub mod query;
-pub mod faction_index;
+pub mod set_code;
 pub mod stat_index;
-pub mod merge;
+
+pub use faction_display::faction_display_name;
+pub use set_code::set_code;

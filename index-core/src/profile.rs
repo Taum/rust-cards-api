@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-/// True when `--profile` is set or `ALT_INDEXER_PROFILE` is `1` / `true` (case-insensitive).
+/// True when `--profile` is set or `CLI_INDEXER_PROFILE` is `1` / `true` (case-insensitive).
 pub fn profile_enabled(cli_flag: bool) -> bool {
     if cli_flag {
         return true;
     }
-    std::env::var("ALT_INDEXER_PROFILE")
+    std::env::var("CLI_INDEXER_PROFILE")
         .ok()
         .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"))
 }

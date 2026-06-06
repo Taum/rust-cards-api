@@ -1,5 +1,5 @@
 [workspace]
-members = ["alt-indexer", "uniques-http-api"]
+members = ["index-core", "cli-indexer", "uniques-http-api"]
 resolver = "2"
 
 [workspace.package]

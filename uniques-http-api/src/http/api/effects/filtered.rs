@@ -1,6 +1,6 @@
 use roaring::RoaringBitmap;
 
-use alt_indexer::bitmap::EffectLine;
+use index_core::bitmap::EffectLine;
 
 use crate::http::api::error::{bad_request, ApiResult};
 use crate::index::UniquesIndex;

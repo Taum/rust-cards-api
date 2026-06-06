@@ -7,10 +7,10 @@ target
 # Contains mutation testing data
 **/mutants.out*/
 
-alt-indexer/out_index
-alt-indexer/full_index
-alt-indexer/test_index
-alt-indexer/tmp-scripts
+cli-indexer/out_index
+cli-indexer/full_index
+cli-indexer/test_index
+cli-indexer/tmp-scripts
 
 uniques-http-api/.env
 uniques-http-api/.env.local

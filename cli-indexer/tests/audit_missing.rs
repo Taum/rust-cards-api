@@ -1,9 +1,9 @@
 use std::fs;
 use std::process::Command;
 
-use alt_indexer::audit_missing;
-use alt_indexer::catalog::Catalog;
-use alt_indexer::compact::{encode_record, CompactCardFields, RECORD_SIZE};
+use index_core::audit_missing;
+use index_core::catalog::Catalog;
+use index_core::compact::{encode_record, CompactCardFields, RECORD_SIZE};
 use tempfile::TempDir;
 
 fn sample_fields(faction: u8) -> CompactCardFields {
@@ -70,7 +70,7 @@ fn audit_missing_cli_json_output() {
     let td = TempDir::new().expect("tempdir");
     write_mini_index(&td);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_alt-indexer"))
+    let output = Command::new(env!("CARGO_BIN_EXE_cli-indexer"))
         .args([
             "audit-missing",
             "--index-dir",

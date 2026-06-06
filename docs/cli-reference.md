@@ -4,22 +4,22 @@ This page lists every command-line interface exposed by this repository.
 
 | Tool | How to run | Interface |
 |------|------------|-----------|
-| **`alt-indexer`** | `cargo run -p alt-indexer -- …` (from repo root) | Subcommands + flags (clap) |
+| **`cli-indexer`** | `cargo run -p cli-indexer -- …` (from repo root) | Subcommands + flags (clap) |
 | **`uniques-http-api`** | `cargo run -p uniques-http-api` (from repo root) | Environment variables only (no subcommands) |
 
-The repository root [`Cargo.toml`](../Cargo.toml) is a Cargo workspace; both crates share one `Cargo.lock` and build into `target/` at the root.
+The repository root [`Cargo.toml`](../Cargo.toml) is a Cargo workspace; all members share one `Cargo.lock` and build into `target/` at the root.
 
 For narrative context, see [Architecture overview](architecture.md).
 
 ---
 
-## `alt-indexer`
+## `cli-indexer`
 
-Binary crate in [`alt-indexer/`](../alt-indexer/). Indexes Equinox-style Unique card JSON into Roaring bitmaps, `cards.bin`, and related metadata.
+Binary crate in [`cli-indexer/`](../cli-indexer/). Indexes Equinox-style Unique card JSON into Roaring bitmaps, `cards.bin`, and related metadata.
 
 ```bash
-cargo run -p alt-indexer -- --help
-cargo run -p alt-indexer -- <SUBCOMMAND> --help
+cargo run -p cli-indexer -- --help
+cargo run -p cli-indexer -- <SUBCOMMAND> --help
 ```
 
 Global options: `-h`, `--help` only (no global flags).
@@ -28,19 +28,19 @@ Global options: `-h`, `--help` only (no global flags).
 
 ```bash
 # 1. Build one set index
-cargo run -p alt-indexer -- build \
+cargo run -p cli-indexer -- build \
   --root /path/to/equinox-cards/cards-unique-COREKS \
   --set COREKS \
   --out ./full_index
 
 # 2. Repeat for other sets, then merge
-cargo run -p alt-indexer -- merge \
+cargo run -p cli-indexer -- merge \
   --index-dir ./full_index \
   --sets COREKS,CORE,ALIZE \
   --out ./full_index/ALL_SETS
 
 # 3. Inspect
-cargo run -p alt-indexer -- query \
+cargo run -p cli-indexer -- query \
   --index-dir ./full_index \
   --set ALL_SETS \
   --id-gd 24,191 \
@@ -65,12 +65,12 @@ Crawl a dataset directory and write a per-set index under `<out>/<SET>/`.
 
 | Variable | Effect |
 |----------|--------|
-| `ALT_INDEXER_PROFILE=1` or `true` | Same as `--profile` (case-insensitive) |
+| `CLI_INDEXER_PROFILE=1` or `true` | Same as `--profile` (case-insensitive) |
 
 **Example**
 
 ```bash
-cargo run -p alt-indexer -- build \
+cargo run -p cli-indexer -- build \
   --root "../equinox-cards/cards-unique-COREKS" \
   --set COREKS \
   --out ./full_index \
@@ -93,7 +93,7 @@ Map a global **`card_index`** (bit position) back to a card reference using `cat
 **Example**
 
 ```bash
-cargo run -p alt-indexer -- decode \
+cargo run -p cli-indexer -- decode \
   --catalog ./full_index/ALL_SETS/catalog.json \
   --bit 42
 ```
@@ -133,16 +133,16 @@ Query an existing index directory. You must pass **either** `--id-gd` **or** `--
 
 ```bash
 # Count cards matching idGd 24 (table output if --list given)
-cargo run -p alt-indexer -- query \
+cargo run -p cli-indexer -- query \
   --index-dir ./full_index --set ALL_SETS --id-gd 24
 
 # Multi-idGd query with effect text
-cargo run -p alt-indexer -- query \
+cargo run -p cli-indexer -- query \
   --index-dir ./full_index --set ALL_SETS \
   --id-gd 24,191,76 --show-effect --list 5 --locale fr_FR
 
 # Single card by reference
-cargo run -p alt-indexer -- query \
+cargo run -p cli-indexer -- query \
   --index-dir ./full_index --set ALL_SETS \
   --refid ALT_COREKS_B_AX_04_U_10
 ```
@@ -162,7 +162,7 @@ Merge two or more **existing** per-set indexes into one global index. Output fil
 **Example**
 
 ```bash
-cargo run -p alt-indexer -- merge \
+cargo run -p cli-indexer -- merge \
   --index-dir ./full_index \
   --sets COREKS,CORE,ALIZE,BISE \
   --out ./full_index/ALL_SETS
@@ -188,7 +188,7 @@ Register a card-list Roaring filter on an existing index from a refs file.
 **Example**
 
 ```bash
-cargo run -p alt-indexer -- add-extra-filter \
+cargo run -p cli-indexer -- add-extra-filter \
   --index-dir ./full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned.txt \
@@ -196,7 +196,7 @@ cargo run -p alt-indexer -- add-extra-filter \
   --negated
 
 # Update the same filter in place
-cargo run -p alt-indexer -- add-extra-filter \
+cargo run -p cli-indexer -- add-extra-filter \
   --index-dir ./full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned-v2.txt \
@@ -218,7 +218,7 @@ Report cards that are allocated in the catalog bit span but missing or invalid i
 **Example**
 
 ```bash
-cargo run -p alt-indexer -- audit-missing \
+cargo run -p cli-indexer -- audit-missing \
   --index-dir ./full_index \
   --set COREKS \
   --json
@@ -253,14 +253,14 @@ Benchmark random idGd queries against an index. Preloads bitmaps and `cards.bin`
 
 In **multi-id** mode, a progress bar on stderr shows combination generation; the report includes total wall time and per-pack stats for sampling.
 
-Use a **release** build for meaningful timings: `cargo build --release -p alt-indexer`.
+Use a **release** build for meaningful timings: `cargo build --release -p cli-indexer`.
 
 **Example**
 
 ```bash
-cargo build --release -p alt-indexer
-./target/release/alt-indexer bench-query \
-  --index-dir ./alt-indexer/full_index \
+cargo build --release -p cli-indexer
+./target/release/cli-indexer bench-query \
+  --index-dir ./cli-indexer/full_index \
   --set ALL_SETS \
   --queries 10000 \
   --multi-ids 6-12 \
@@ -282,7 +282,7 @@ cargo run -p uniques-http-api
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `INDEX_PATH` | **yes** | — | Path to the index folder itself (e.g. `../alt-indexer/full_index/ALL_SETS`) |
+| `INDEX_PATH` | **yes** | — | Path to the index folder itself (e.g. `../cli-indexer/full_index/ALL_SETS`) |
 | `PORT` | no | `8080` | TCP port; bind address is always `0.0.0.0` |
 
 **Local development**
@@ -291,7 +291,7 @@ Copy [`uniques-http-api/.env.example`](../uniques-http-api/.env.example) to `.en
 
 ```env
 PORT=8234
-INDEX_PATH=../alt-indexer/full_index/ALL_SETS
+INDEX_PATH=../cli-indexer/full_index/ALL_SETS
 ```
 
 `load_env()` loads `.env` first, then **overrides** with `.env.local`.

@@ -1,5 +1,4 @@
 use anyhow::{bail, Context, Result};
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -7,11 +6,23 @@ pub const EXTRA_CATALOG_VERSION: u32 = 1;
 pub const EXTRA_DIR: &str = "extra";
 pub const EXTRA_CATALOG_FILE: &str = "extra_catalog.json";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtraFilterType {
     Format,
     Property,
+}
+
+impl std::str::FromStr for ExtraFilterType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "format" => Ok(Self::Format),
+            "property" => Ok(Self::Property),
+            _ => Err(format!("unknown filter type: {s} (expected format or property)")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

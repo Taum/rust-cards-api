@@ -1,11 +1,11 @@
-use crate::add_extra_filter;
-use crate::audit_missing;
-use crate::build;
+use index_core::add_extra_filter;
+use index_core::audit_missing;
+use index_core::build;
+use index_core::decode;
+use index_core::merge;
+use index_core::query;
+use index_core::extra_catalog::ExtraFilterType;
 use crate::bench_query;
-use crate::decode;
-use crate::merge;
-use crate::query;
-use crate::extra_catalog::ExtraFilterType;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -33,7 +33,7 @@ fn parse_multi_ids_range(s: &str) -> Result<(usize, usize), String> {
 }
 
 #[derive(Parser)]
-#[command(name = "alt-indexer", about = "Index card JSON by idGd into Roaring bitmaps")]
+#[command(name = "cli-indexer", about = "Index card JSON by idGd into Roaring bitmaps")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -55,7 +55,7 @@ pub enum Command {
         /// Stop discovery and indexing after this many files (for testing).
         #[arg(long)]
         limit: Option<usize>,
-        /// Print build phase timings (read, parse, process, write). Also enabled by ALT_INDEXER_PROFILE=1.
+        /// Print build phase timings (read, parse, process, write). Also enabled by CLI_INDEXER_PROFILE=1.
         #[arg(long)]
         profile: bool,
     },
@@ -172,7 +172,7 @@ pub enum Command {
         #[arg(long)]
         refs_file: PathBuf,
         /// Optional filter category for downstream consumers.
-        #[arg(long)]
+        #[arg(long, value_parser = clap::value_parser!(ExtraFilterType))]
         r#type: Option<ExtraFilterType>,
         /// Store refs as an exception set (AND NOT at query time).
         #[arg(long, default_value_t = false)]

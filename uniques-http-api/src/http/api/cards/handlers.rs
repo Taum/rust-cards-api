@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use axum::extract::{Path, RawQuery};
 use axum::Json;
 
-use alt_indexer::idgd_catalog::IdGdCatalogEntry;
+use index_core::idgd_catalog::IdGdCatalogEntry;
 
 use crate::http::api::cards::parse::{parse_query_multimap, parse_request};
 use crate::http::api::error::{bad_request, map_query_error, not_found, ApiResult};

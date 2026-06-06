@@ -51,8 +51,8 @@ mod tests {
 
     use axum::body::Bytes;
 
-    use alt_indexer::catalog::Catalog;
-    use alt_indexer::idgd_catalog::IdGdCatalog;
+    use index_core::catalog::Catalog;
+    use index_core::idgd_catalog::IdGdCatalog;
 
     use crate::index::loader::{
         build_family_lookup_index, build_name_search_index, FactionsSummary, IndexManifest,

@@ -17,7 +17,8 @@ Access the demo at https://taum.github.io/rust-cards-api/
 
 | Directory                                | Description                              |
 | ---------------------------------------- | ---------------------------------------- |
-| `[alt-indexer/](alt-indexer/)`           | Build and merge the index from card JSON |
+| `[index-core/](index-core/)`             | Shared index library (build, query, types) |
+| `[cli-indexer/](cli-indexer/)`           | CLI to build and merge the index from card JSON |
 | `[uniques-http-api/](uniques-http-api/)` | Load the index and expose the REST API   |
 | `[demo-ui/](demo-ui/)`                   | Browser demo UI (optional)               |
 
@@ -39,7 +40,7 @@ Follow instructions at [https://rust-lang.org/tools/install/](https://rust-lang.
 This repo is a Cargo workspace. Run commands from the root directory:
 
 ```
-cargo run -p alt-indexer -- --help
+cargo run -p cli-indexer -- --help
 cargo run -p uniques-http-api
 ```
 
@@ -47,7 +48,7 @@ Or build release binaries:
 
 ```
 cargo build --release
-.\target\release\alt-indexer.exe --help   # adjust to match your OS
+.\target\release\cli-indexer.exe --help   # adjust to match your OS
 .\target\release\uniques-http-api.exe
 ```
 
@@ -57,4 +58,4 @@ See [CLI Reference](./docs/cli-reference.md) for command-line examples.
 
 A [Dockerfile](./Dockerfile) builds the HTTP server image with embedded index.
 
-The expected process is to build the index first (into `alt-indexer/full_index`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.
+The expected process is to build the index first (into `cli-indexer/full_index`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.

@@ -3,7 +3,7 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 
-use alt_indexer::bitmap::EffectLine;
+use index_core::bitmap::EffectLine;
 
 use crate::http::api::cards::parse::{parse_query_multimap, parse_request};
 use crate::http::api::error::{bad_request, ApiResult};

@@ -4,13 +4,13 @@ This document describes how **uniques-http-api** is structured.
 
 ### Index on disk
 
-Production and local dev use the merged index at `alt-indexer/full_index/ALL_SETS` (see repo `AGENTS.md`). It combines all sets (`CORE`, `COREKS`, `ALIZE`, …) into one global bit space.
+Production and local dev use the merged index at `cli-indexer/full_index/ALL_SETS` (see repo `AGENTS.md`). It combines all sets (`CORE`, `COREKS`, `ALIZE`, …) into one global bit space.
 
-At startup, `INDEX_PATH` (default in `.env.local`: `./alt-indexer/full_index/ALL_SETS`) points at that directory. The loader reads every referenced file into memory once; then responds to requests only from the data loaded into memory.
+At startup, `INDEX_PATH` (default in `.env.local`: `./cli-indexer/full_index/ALL_SETS`) points at that directory. The loader reads every referenced file into memory once; then responds to requests only from the data loaded into memory.
 
 ## Overview
 
-The crate splits into two top-level modules: **`index/`** (load and query the on-disk index) and **`http/`** (Axum routes, request parsing, JSON responses). Both depend on the **`alt-indexer`** library for shared index types.
+The crate splits into two top-level modules: **`index/`** (load and query the on-disk index) and **`http/`** (Axum routes, request parsing, JSON responses). Both depend on the **`index-core`** library for shared index types.
 
 Arrows point from a module **toward what it depends on** (deeper in the diagram).
 
@@ -24,14 +24,14 @@ flowchart TB
   env["env.rs"]
 
 
-  alt[alt-indexer]
+  core[index-core]
 
   main --> env
   main --> index-loader
   main --> http
   http --> index-query
-  index-loader --> alt
-  index-query --> alt
+  index-loader --> core
+  index-query --> core
 ```
 
 ## Source layout (`uniques-http-api/src`)

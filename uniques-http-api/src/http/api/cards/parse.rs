@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use url::form_urlencoded;
 
-use alt_indexer::faction_index::Faction;
+use index_core::faction_index::Faction;
 
 use crate::http::api::error::{bad_request, ApiResult};
 use crate::index::UniquesIndex;
@@ -467,7 +467,7 @@ mod tests {
     use crate::http::api::cards::test_support::{test_state, test_state_with_sets};
     use crate::index::loader::{SET_CORE, SET_COREKS};
     use crate::http::api::cards::models::CostPredicate;
-    use alt_indexer::faction_index::Faction;
+    use index_core::faction_index::Faction;
     use axum::http::StatusCode;
     use std::collections::HashMap;
     #[test]

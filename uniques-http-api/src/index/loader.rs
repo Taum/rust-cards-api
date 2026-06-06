@@ -3,13 +3,13 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use alt_indexer::bitmap::{BitmapStore, EffectLine};
-use alt_indexer::catalog::Catalog;
-use alt_indexer::path::ParsedCardPath;
-use alt_indexer::compact::RECORD_SIZE;
-use alt_indexer::faction_index::Faction;
-use alt_indexer::idgd_catalog::IdGdCatalog;
-use alt_indexer::stat_index::StatField;
+use index_core::bitmap::{BitmapStore, EffectLine};
+use index_core::catalog::Catalog;
+use index_core::path::ParsedCardPath;
+use index_core::compact::RECORD_SIZE;
+use index_core::faction_index::Faction;
+use index_core::idgd_catalog::IdGdCatalog;
+use index_core::stat_index::StatField;
 use anyhow::{bail, Context, Result};
 use roaring::RoaringBitmap;
 use serde::Deserialize;
@@ -513,8 +513,8 @@ fn load_factions(index_dir: &Path, summary: &FactionsSummary) -> Result<BTreeMap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alt_indexer::catalog::{FamilyEntry, FamilySet};
-    use alt_indexer::path::parse_card_reference;
+    use index_core::catalog::{FamilyEntry, FamilySet};
+    use index_core::path::parse_card_reference;
 
     fn test_family_entry(start_bit: u32, max_unique_id: u32) -> FamilyEntry {
         FamilyEntry {

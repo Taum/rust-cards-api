@@ -1,14 +1,14 @@
 # `ALL_SETS` index format specification
 
-This document specifies the on-disk format written by the `alt-indexer` tool for a **merged “all sets” index** (commonly named `ALL_SETS`), so an external project can load and query the index without depending on this repository.
+This document specifies the on-disk format written by the `cli-indexer` tool for a **merged “all sets” index** (commonly named `ALL_SETS`), so an external project can load and query the index without depending on this repository.
 
 The merged index is produced by:
 
 ```text
-alt-indexer build --root "..\path\to\equinox-cards\cards-unique-CORE" --set CORE --out ./full_index
-alt-indexer build --root "..\path\to\equinox-cards\cards-unique-COREKS" --set COREKS --out ./full_index
+cli-indexer build --root "..\path\to\equinox-cards\cards-unique-CORE" --set CORE --out ./full_index
+cli-indexer build --root "..\path\to\equinox-cards\cards-unique-COREKS" --set COREKS --out ./full_index
 ...
-alt-indexer merge --index-dir ./full_index --sets COREKS,CORE,... --out ./final_index/ALL_SETS
+cli-indexer merge --index-dir ./full_index --sets COREKS,CORE,... --out ./final_index/ALL_SETS
 ```
 
 The **merged set name** is the final path component of `--out` (e.g. `ALL_SETS`). All files described below are written **directly under that folder**.
@@ -342,7 +342,7 @@ For each `idGd` value present in the merged index, the indexer writes one or mor
 | `{id_gd}_m1.roar` … `{id_gd}_m3.roar` | **Per-line** index for `MAIN_EFFECT` groups 1..3: set bit only if `idGd` appears on that specific effect line. |
 | `{id_gd}_ec.roar` | **Per-line** index for `ECHO_EFFECT`: set bit only if `idGd` appears on the echo line. |
 
-`alt-indexer query` uses per-line files by default (same-line matching). Pass `--whole-card` to use only `{id_gd}.roar`.
+`cli-indexer query` uses per-line files by default (same-line matching). Pass `--whole-card` to use only `{id_gd}.roar`.
 
 ### File naming
 
@@ -437,7 +437,7 @@ Nested keys `m1`, `m2`, `m3`, `ec` are omitted when the corresponding per-line b
 - **`card_count`** (`u64`): cardinality of the **whole-card** bitmap `{id_gd}.roar`.
 - **`bitmap_bytes`** (`u64`): byte length of `id_gd/<id_gd>.roar`.
 - **`bitmap_file`** (`string`): filename only (e.g. `"191.roar"`); relative to `id_gd/`.
-- **`element_type`** (`string`): one of `"TRIGGER"`, `"CONDITION"`, `"OUTPUT"` (used by `alt-indexer query` for bucket grouping).
+- **`element_type`** (`string`): one of `"TRIGGER"`, `"CONDITION"`, `"OUTPUT"` (used by `cli-indexer query` for bucket grouping).
 - **`is_echo`** (`boolean` or `null`):
   - `false` — idGd appears only under **MAIN_EFFECT** lines (`m1`..`m3`).
   - `true` — idGd appears only under **ECHO_EFFECT** (`ec`).
@@ -575,7 +575,7 @@ Cards with unknown or missing `mainFaction.reference` appear in no faction bitma
 
 ## `extra_catalog.json`
 
-Optional registry of user-defined card-list filters (see `alt-indexer add-extra-filter`).
+Optional registry of user-defined card-list filters (see `cli-indexer add-extra-filter`).
 
 ```json
 {
@@ -654,11 +654,11 @@ Optional registry of user-defined card-list filters (see `alt-indexer add-extra-
 2. Load `id_gd/N.roar` (whole-card bitmap) and iterate its `card_index` values.
 3. For each `card_index`, decode reference using the catalog.
 
-Or use `alt-indexer query --id-gd N` (per-line by default; add `--whole-card` for step 2 only).
+Or use `cli-indexer query --id-gd N` (per-line by default; add `--whole-card` for step 2 only).
 
 ### “Intersect multiple idGd constraints” (e.g. trigger 24 AND condition 191)
 
-**Default (`alt-indexer query`, per-line index)** — ids must match on the **same effect line**:
+**Default (`cli-indexer query`, per-line index)** — ids must match on the **same effect line**:
 
 1. Group requested ids by `element_type` from `idgd_catalog.json` (TRIGGER / CONDITION / OUTPUT).
 2. For each line `m1`, `m2`, `m3`, `ec`:
@@ -672,7 +672,7 @@ Example: `--id-gd 24,191` matches cards where trigger 24 and condition 191 appea
 
 1. Union all trigger ids using `{id}.roar` files.
 2. Union all condition ids using `{id}.roar` files.
-3. Intersect the bucket groups (same as pre–per-line `alt-indexer` behavior).
+3. Intersect the bucket groups (same as pre–per-line `cli-indexer` behavior).
 
 Roaring bitmaps support fast set ops for custom consumers:
 
@@ -715,20 +715,20 @@ For each matching `card_index`:
   - `element_type` is authoritative for query bucketing into TRIGGER/CONDITION/OUTPUT.
   - `is_echo` distinguishes main-effect vs echo-effect idGds (`null` = indexed in both; treat as invalid).
   - Nested `m1`/`m2`/`m3`/`ec` objects are omitted when the corresponding per-line file was not written.
-- **Query tools**: `alt-indexer query` and `bench-query` default to per-line bitmaps; `--whole-card` selects `{id}.roar` only. Indexes built before per-line bitmaps were added must be rebuilt for default query to return results.
+- **Query tools**: `cli-indexer query` and `bench-query` default to per-line bitmaps; `--whole-card` selects `{id}.roar` only. Indexes built before per-line bitmaps were added must be rebuilt for default query to return results.
 
 ---
 
 ## Reference implementation sources
 
-This format is defined by the `alt-indexer` crate:
+This format is defined by the `index-core` library and `cli-indexer` CLI:
 
-- `alt-indexer/src/merge.rs` (merged index writer)
-- `alt-indexer/src/catalog.rs` (catalog schema + decode)
-- `alt-indexer/src/compact.rs` (`cards.bin` record layout)
-- `alt-indexer/src/idgd_catalog.rs` (`idgd_catalog.json` schema, including `is_echo`)
-- `alt-indexer/src/query.rs` (per-line vs `--whole-card` query)
-- `alt-indexer/src/bench_query.rs` (benchmark preload + query modes)
-- `alt-indexer/src/stat_index.rs` (`stats_summary.json` + bucket layout)
-- `alt-indexer/src/faction_index.rs` (`factions_summary.json` + bitmap layout)
+- `index-core/src/merge.rs` (merged index writer)
+- `index-core/src/catalog.rs` (catalog schema + decode)
+- `index-core/src/compact.rs` (`cards.bin` record layout)
+- `index-core/src/idgd_catalog.rs` (`idgd_catalog.json` schema, including `is_echo`)
+- `index-core/src/query.rs` (per-line vs `--whole-card` query)
+- `cli-indexer/src/bench_query.rs` (benchmark preload + query modes)
+- `index-core/src/stat_index.rs` (`stats_summary.json` + bucket layout)
+- `index-core/src/faction_index.rs` (`factions_summary.json` + bitmap layout)
 

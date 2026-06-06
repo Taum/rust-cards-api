@@ -1,13 +1,14 @@
-use alt_indexer::build;
-use alt_indexer::catalog::Catalog;
-use alt_indexer::query;
+use index_core::build;
+use index_core::catalog::Catalog;
+use index_core::query;
 use std::fs;
 use std::path::PathBuf;
 
 fn setup_fixture_dataset() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_path_buf();
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../index-core/tests/card-json");
 
     let cards = [
         ("AX", "06", "ALT_COREKS_B_AX_06_U_5.json"),
@@ -22,7 +23,7 @@ fn setup_fixture_dataset() -> (tempfile::TempDir, PathBuf) {
             .join(faction)
             .join(family);
         fs::create_dir_all(&dest_dir).expect("mkdir");
-        fs::copy(manifest.join("tests/card-json").join(file), dest_dir.join(file)).expect("copy");
+        fs::copy(fixtures.join(file), dest_dir.join(file)).expect("copy");
     }
 
     (dir, root)
@@ -163,7 +164,7 @@ fn build_query_decode_tmp_fixtures() {
 fn build_profile_flag_prints_report() {
     let (_guard, root) = setup_fixture_dataset();
     let out = tempfile::tempdir().expect("out tempdir");
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_alt-indexer"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_cli-indexer"))
         .args([
             "build",
             "--root",

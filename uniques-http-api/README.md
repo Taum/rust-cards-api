@@ -2,7 +2,7 @@
 
 HTTP API service for querying the merged `ALL_SETS` index.
 
-There is no runtime dependency from `alt-indexer` on the HTTP API. The HTTP crate depends on `alt-indexer` as a **library** for shared types (`Catalog`, `CompactCardView`, `IdGdCatalog`, bitmap helpers, reference parsing, etc.).
+There is no runtime dependency from `cli-indexer` on the HTTP API. The HTTP crate depends on **`index-core`** for shared types (`Catalog`, `CompactCardView`, `IdGdCatalog`, bitmap helpers, reference parsing, etc.).
 
 
 ## Local development
@@ -10,7 +10,7 @@ There is no runtime dependency from `alt-indexer` on the HTTP API. The HTTP crat
 - **Config**: copy `uniques-http-api/.env.example` to `.env` (optional shared defaults), then create `.env.local` from `.env.local.template` for local overrides.
 - **Defaults**:
   - `PORT=8234` (local dev)
-  - `INDEX_PATH=../alt-indexer/full_index/ALL_SETS`
+  - `INDEX_PATH=../cli-indexer/full_index/ALL_SETS`
 
 Run:
 
@@ -30,7 +30,7 @@ curl http://127.0.0.1:8234/healthz
 
 The repo-root `Dockerfile` expects this directory to exist in the build context:
 
-- `alt-indexer/full_index/ALL_SETS`
+- `cli-indexer/full_index/ALL_SETS`
 
 Build:
 

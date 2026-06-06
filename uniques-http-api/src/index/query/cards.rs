@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use roaring::RoaringBitmap;
 
-use alt_indexer::bitmap::EffectLine;
-use alt_indexer::idgd_catalog::IdGdCatalogEntry;
-use alt_indexer::stat_index::StatField;
+use index_core::bitmap::EffectLine;
+use index_core::idgd_catalog::IdGdCatalogEntry;
+use index_core::stat_index::StatField;
 
 use crate::index::UniquesIndex;
 use crate::index::loader::{SetBitmaps, SET_CORE, SET_COREKS};
@@ -299,7 +299,7 @@ pub(crate) fn card_v2_from_index(
         .map_err(|e| QueryError::invalid(format!("family lookup for card_index {card_index}: {e}")))?;
 
     let faction_code = faction_from_code(view.faction_code());
-    let faction_name = alt_indexer::faction_display_name(&faction_code)
+    let faction_name = index_core::faction_display_name(&faction_code)
         .unwrap_or("")
         .to_string();
 
@@ -456,7 +456,7 @@ fn faction_from_code(code: u8) -> String {
     .to_string()
 }
 
-fn build_debug_bga_trigram(view: &alt_indexer::compact::CompactCardView<'_>) -> String {
+fn build_debug_bga_trigram(view: &index_core::compact::CompactCardView<'_>) -> String {
     let mut triplets: Vec<String> = Vec::new();
     for g in 0..3 {
         if let Some(triplet) = format_tco_triplet(view.main_effect_group(g)) {
@@ -478,7 +478,7 @@ fn format_tco_triplet([t, c, o]: [u16; 3]) -> Option<String> {
 
 fn build_main_effect_localized(
     idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
-    view: &alt_indexer::compact::CompactCardView<'_>,
+    view: &index_core::compact::CompactCardView<'_>,
 ) -> BTreeMap<String, String> {
     let groups: [[u16; 3]; 3] = [
         view.main_effect_group(0),
@@ -518,7 +518,7 @@ fn build_main_effect_localized(
 
 fn build_echo_effect_localized(
     idgd_by_id: &BTreeMap<u32, &IdGdCatalogEntry>,
-    view: &alt_indexer::compact::CompactCardView<'_>,
+    view: &index_core::compact::CompactCardView<'_>,
 ) -> BTreeMap<String, String> {
     let [t, c, o] = view.echo_effect();
 
@@ -572,7 +572,7 @@ fn build_effect_line_localized(
     }
 }
 
-fn pick_translation(map: &BTreeMap<String, alt_indexer::card::LocaleText>, locale: &str) -> String {
+fn pick_translation(map: &BTreeMap<String, index_core::card::LocaleText>, locale: &str) -> String {
     if let Some(t) = map.get(locale) {
         return t.text.clone();
     }

@@ -1,10 +1,10 @@
-use crate::bitmap::EffectLine;
-use crate::bitmap::BitmapStore;
-use crate::catalog::Catalog;
-use crate::compact::CompactCardView;
-use crate::idgd_catalog::IdGdCatalog;
-use crate::progress::MultiIdCombinationProgress;
-use crate::query::{execute_idgd_query_preloaded, IdGdQueryBuckets};
+use index_core::bitmap::EffectLine;
+use index_core::bitmap::BitmapStore;
+use index_core::catalog::Catalog;
+use index_core::compact::CompactCardView;
+use index_core::idgd_catalog::IdGdCatalog;
+use index_core::progress::MultiIdCombinationProgress;
+use index_core::query::{execute_idgd_query_preloaded, IdGdQueryBuckets};
 use anyhow::{Context, Result};
 use roaring::RoaringBitmap;
 use serde::Serialize;

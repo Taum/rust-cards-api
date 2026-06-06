@@ -4,18 +4,22 @@ Project-wide notes for AI agents working in this repo.
 
 ## Cargo workspace
 
-The repository root [`Cargo.toml`](Cargo.toml) is a workspace with members `alt-indexer` and `uniques-http-api`. Run `cargo build`, `cargo test`, and `cargo run -p <crate>` from the repo root. Build output goes to `target/` at the root (not under individual crate directories).
+The repository root [`Cargo.toml`](Cargo.toml) is a workspace with members `index-core`, `cli-indexer`, and `uniques-http-api`. Run `cargo build`, `cargo test`, and `cargo run -p <crate>` from the repo root. Build output goes to `target/` at the root (not under individual crate directories).
 
-## Index layout (`alt-indexer/full_index/`)
+- **`index-core`**: shared index library (build, merge, load types, query, bitmaps, catalogs).
+- **`cli-indexer`**: CLI binary (`build`, `merge`, `query`, etc.) — thin wrapper over `index-core`.
+- **`uniques-http-api`**: HTTP server; depends on `index-core` for index types and query helpers.
+
+## Index layout (`cli-indexer/full_index/`)
 
 This directory is gitignored (not committed) but present on disk and readable.
 
-- **`alt-indexer/full_index/ALL_SETS`** is the index to use. It is the **merged** index
+- **`cli-indexer/full_index/ALL_SETS`** is the index to use. It is the **merged** index
   (`manifest.json` → `"kind": "merge"`) combining all single-set indexes into one
   global bit space. This is what `uniques-http-api` loads by default
-  (`INDEX_PATH=./alt-indexer/full_index/ALL_SETS`, see `uniques-http-api/.env.local`).
+  (`INDEX_PATH=./cli-indexer/full_index/ALL_SETS`, see `uniques-http-api/.env.local`).
 - The sibling folders (`CORE`, `COREKS`, `ALIZE`, `BISE`, `CYCLONE`, `DUSTER`, `EOLE`)
-  are **single-set** indexes produced by `alt-indexer build`. The `merge` subcommand
+  are **single-set** indexes produced by `cli-indexer build`. The `merge` subcommand
   combines them into `ALL_SETS`.
 
 Current `ALL_SETS` stats (from `manifest.json`): ~5,455,928 cards (`total_bit_span`),

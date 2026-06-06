@@ -597,7 +597,7 @@ fn warn_if_missing_per_line_bitmaps(id_gd_dir: &Path, buckets: &IdGdQueryBuckets
             id_gd_dir.display()
         );
         eprintln!(
-            "         Rebuild the index (alt-indexer build) or pass --whole-card to use combined {{id}}.roar files."
+            "         Rebuild the index (cli-indexer build) or pass --whole-card to use combined {{id}}.roar files."
         );
     }
 }

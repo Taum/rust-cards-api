@@ -1,6 +1,6 @@
-use alt_indexer::add_extra_filter::{add_extra_filter, AddExtraFilterOptions};
-use alt_indexer::build;
-use alt_indexer::extra_catalog::{ExtraCatalog, ExtraFilterType, EXTRA_CATALOG_FILE, EXTRA_DIR};
+use index_core::add_extra_filter::{add_extra_filter, AddExtraFilterOptions};
+use index_core::build;
+use index_core::extra_catalog::{ExtraCatalog, ExtraFilterType, EXTRA_CATALOG_FILE, EXTRA_DIR};
 use roaring::RoaringBitmap;
 use std::fs;
 use std::path::PathBuf;
@@ -8,7 +8,8 @@ use std::path::PathBuf;
 fn setup_fixture_dataset() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path().to_path_buf();
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../index-core/tests/card-json");
 
     let cards = [
         ("AX", "06", "ALT_COREKS_B_AX_06_U_5.json"),
@@ -23,7 +24,7 @@ fn setup_fixture_dataset() -> (tempfile::TempDir, PathBuf) {
             .join(faction)
             .join(family);
         fs::create_dir_all(&dest_dir).expect("mkdir");
-        fs::copy(manifest.join("tests/card-json").join(file), dest_dir.join(file)).expect("copy");
+        fs::copy(fixtures.join(file), dest_dir.join(file)).expect("copy");
     }
 
     (dir, root)

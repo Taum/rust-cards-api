@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-alt-indexer = { path = "../alt-indexer" }
+index-core = { path = "../index-core" }
 anyhow.workspace = true
 axum = "0.8.4"
 tower-http = { version = "0.6", features = ["cors"] }

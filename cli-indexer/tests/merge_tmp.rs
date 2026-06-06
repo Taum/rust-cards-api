@@ -1,5 +1,5 @@
-use alt_indexer::catalog::Catalog;
-use alt_indexer::merge::merge_indexes;
+use index_core::catalog::Catalog;
+use index_core::merge::merge_indexes;
 use roaring::RoaringBitmap;
 use serde_json::json;
 use std::fs;
@@ -21,7 +21,7 @@ fn write_bitmap(path: &Path, bits: &[u32]) {
 }
 
 fn write_zero_cards(path: &Path, total_bit_span: u32) {
-    let len = total_bit_span as usize * alt_indexer::compact::RECORD_SIZE;
+    let len = total_bit_span as usize * index_core::compact::RECORD_SIZE;
     fs::write(path, vec![0u8; len]).expect("write cards.bin");
 }
 

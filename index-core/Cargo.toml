@@ -1,11 +1,10 @@
 [package]
-name = "alt-indexer"
+name = "index-core"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-clap = { version = "4", features = ["derive"] }
 regex = "1"
 roaring.workspace = true
 serde.workspace = true

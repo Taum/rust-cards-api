@@ -12,21 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alt-indexer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "indicatif",
- "regex",
- "roaring",
- "serde",
- "serde_json",
- "tempfile",
- "walkdir",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -336,6 +321,19 @@ name = "clap_lex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
+
+[[package]]
+name = "cli-indexer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "index-core",
+ "roaring",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "colorchoice"
@@ -948,6 +946,20 @@ checksum = "cb68373c0d6620ef8105e855e7745e18b0d00d3bdb07fb532e434244cdb9a714"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "index-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "indicatif",
+ "regex",
+ "roaring",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "walkdir",
 ]
 
 [[package]]
@@ -1999,13 +2011,13 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 name = "uniques-http-api"
 version = "0.1.0"
 dependencies = [
- "alt-indexer",
  "anyhow",
  "async-trait",
  "axum",
  "chrono",
  "dotenvy",
  "http-body-util",
+ "index-core",
  "roaring",
  "serde",
  "serde_json",

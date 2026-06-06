@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use alt_indexer::faction_index::Faction;
+use index_core::faction_index::Faction;
 
 // --- Response bodies ---
 
@@ -28,8 +28,8 @@ pub struct CardSetV2 {
     pub code: Option<String>,
 }
 
-impl From<&alt_indexer::catalog::FamilySet> for CardSetV2 {
-    fn from(set: &alt_indexer::catalog::FamilySet) -> Self {
+impl From<&index_core::catalog::FamilySet> for CardSetV2 {
+    fn from(set: &index_core::catalog::FamilySet) -> Self {
         Self {
             reference: set.reference.clone(),
             name: set.name.clone(),

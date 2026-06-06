@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use alt_indexer::bitmap::EffectLine;
-use alt_indexer::catalog::{Catalog, FamilyCardSubType, FamilyEntry, FamilySet, FACTION_ORDER};
-use alt_indexer::compact::{encode_record, CompactCardFields, RECORD_SIZE};
-use alt_indexer::faction_index::Faction;
-use alt_indexer::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
-use alt_indexer::stat_index::StatField;
+use index_core::bitmap::EffectLine;
+use index_core::catalog::{Catalog, FamilyCardSubType, FamilyEntry, FamilySet, FACTION_ORDER};
+use index_core::compact::{encode_record, CompactCardFields, RECORD_SIZE};
+use index_core::faction_index::Faction;
+use index_core::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
+use index_core::stat_index::StatField;
 use roaring::RoaringBitmap;
 
 use crate::http::state::AppState;

@@ -37,7 +37,7 @@ The pipeline has three main steps:
 
 ```mermaid
 flowchart LR
-  JSON["Card JSON on disk"] --> Build["alt-indexer build / merge"]
+  JSON["Card JSON on disk"] --> Build["cli-indexer build / merge"]
   Build --> Index["Compact index ~300MB"]
   Index --> Load["uniques-http-api loads into RAM"]
   Load --> API["HTTP queries"]
@@ -45,7 +45,7 @@ flowchart LR
 
 ### 1. Build a compact index
 
-The **`alt-indexer`** crate walks the Equinox-style Unique card dataset (one JSON file per card), extracts filter-relevant fields once, and writes a **read-optimized** binary index:
+The **`index-core`** library (invoked by the **`cli-indexer`** CLI) walks the Equinox-style Unique card dataset (one JSON file per card), extracts filter-relevant fields once, and writes a **read-optimized** binary index:
 
 - No duplicate card JSON in the index
 - Shared properties (e.g. “has ability 123”) are stored once as **bitmaps** over a global `card_index` space
@@ -54,7 +54,7 @@ The **`alt-indexer`** crate walks the Equinox-style Unique card dataset (one JSO
 
 Using these catalogs, we can quickly reconstruct a `card_index` <-> `referenceID` (`ALT_CORE_B_AX_05_U_1234`) mapping. 
 
-Per-set indexes can be **merged** into a single `ALL_SETS` universe (see [merge plan](../alt-indexer/plans/04-merge-indexes.md)).
+Per-set indexes can be **merged** into a single `ALL_SETS` universe (see [merge plan](../cli-indexer/plans/04-merge-indexes.md)).
 
 ### 2. Load the index in memory
 
@@ -87,7 +87,7 @@ Rust is a good fit for this kind of system:
 - **Strong tooling for binary data** — fixed-size records, `u8`/`u16` packing, mmap-friendly layouts, and safe parsing of large byte buffers.
 - **Ecosystem** — [roaring-rs](https://github.com/RoaringBitmap/roaring-rs) for bitmaps, Axum for the HTTP server, serde for the small JSON metadata files.
 
-The indexer and API share types and logic via the `alt-indexer` library crate; the HTTP service is a thin layer over that core.
+The indexer and API share types and logic via the **`index-core`** library crate; the HTTP service is a thin layer over that core.
 
 ---
 
@@ -95,7 +95,8 @@ The indexer and API share types and logic via the `alt-indexer` library crate; t
 
 | Component | Role |
 |-----------|------|
-| **`alt-indexer/`** | CLI and library: crawl JSON, build bitmaps, write `cards.bin`, merge sets, bench queries. |
+| **`index-core/`** | Shared library: index types, build/merge/query logic, bitmaps, catalogs. |
+| **`cli-indexer/`** | CLI: crawl JSON, build bitmaps, write `cards.bin`, merge sets, bench queries. |
 | **`uniques-http-api/`** | Loads `ALL_SETS` (or a set index) and exposes REST endpoints. |
 | **`demo-ui/`** | Optional React demo that calls the API (filters, card preview). |
 | **`docs/`** | Architecture (this file) and index format specs. |
@@ -162,9 +163,9 @@ the server can jump directly into the byte slice without parsing JSON or walking
 
 **Design and layout** are documented in the indexer plan:
 
-- [idGd compact card format (`cards.bin`)](../alt-indexer/plans/02-idgd-compact-card-format.md)
+- [idGd compact card format (`cards.bin`)](../cli-indexer/plans/02-idgd-compact-card-format.md)
 
-Implementation: `alt_indexer::compact` (`CompactCardView`, `RECORD_SIZE`).
+Implementation: `index_core::compact` (`CompactCardView`, `RECORD_SIZE`).
 
 Human-readable effect strings are resolved at query time via `idgd_catalog.json` (id → text), not duplicated in every card row.
 
@@ -178,7 +179,7 @@ Human-readable effect strings are resolved at query time via `idgd_catalog.json`
 4. For each index in the page, decode reference from `catalog`, stats/effects from `cards.bin`, attach display text from catalogs.
 5. Return JSON (`CardsResponse`).
 
-Benchmarks in `alt-indexer bench-query` time query intersection and optional card decode with everything already in RAM; see [bench-query plans](../alt-indexer/plans/05-bench-query.md) and [select profiling](../alt-indexer/plans/12-bench-query-select-profiling.md).
+Benchmarks in `cli-indexer bench-query` time query intersection and optional card decode with everything already in RAM; see [bench-query plans](../cli-indexer/plans/05-bench-query.md) and [select profiling](../cli-indexer/plans/12-bench-query-select-profiling.md).
 
 ---
 
@@ -188,7 +189,7 @@ Benchmarks in `alt-indexer bench-query` time query intersection and optional car
 |-------|----------|
 | CLI commands & flags | [cli-reference.md](cli-reference.md) |
 | Index byte layout & merge semantics | [ALL_SETS-index-format.md](ALL_SETS-index-format.md) |
-| Bitmap indexer design | [01-idgd-bitset-indexer.md](../alt-indexer/plans/01-idgd-bitset-indexer.md) |
-| `cards.bin` record layout | [02-idgd-compact-card-format.md](../alt-indexer/plans/02-idgd-compact-card-format.md) |
+| Bitmap indexer design | [01-idgd-bitset-indexer.md](../cli-indexer/plans/01-idgd-bitset-indexer.md) |
+| `cards.bin` record layout | [02-idgd-compact-card-format.md](../cli-indexer/plans/02-idgd-compact-card-format.md) |
 | HTTP API | [api-spec.md](api-spec.md) |
 | Deploy / Cloud Run | [uniques-http-api README](../uniques-http-api/README.md) |
