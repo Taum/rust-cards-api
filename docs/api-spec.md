@@ -34,6 +34,7 @@
 | Yes       | `effect[0][t]` | integer id or comma-separated list | `5`, `1,5,12`     | Ability trigger idGd for slot 0.           |
 | Yes       | `effect[0][c]` | integer id or comma-separated list | `3`, `3,16,199`   | Ability condition idGd for slot 0.         |
 | Yes       | `effect[0][o]` | integer id or comma-separated list | `42`, `42,94,601` | Ability output idGd for slot 0.            |
+| Yes       | `effect[0][matchCount]` | `1` (default), `2` or `3` | `2`               | Require `matchCount` abilities matching the predicates. |
 | Yes       | `effect[1][t]` | integer id or comma-separated list | `24`              | Ability trigger idGd for slot 1.           |
 | Yes       | `effect[1][c]` | integer id or comma-separated list | `191`             | Ability condition idGd for slot 1.         |
 | Yes       | `effect[1][o]` | integer id or comma-separated list | `90`              | Ability output idGd for slot 1.            |
@@ -49,11 +50,11 @@ If multiple effects are specified, the `effectMode` determines if the card must 
 ### Response options
 
 
-| Supported | Parameter      | Type | Example        | Meaning                                                                                                                 |
-| --------- | -------------- | ---- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Supported | Parameter      | Type | Example        | Meaning                                                                                                                                                                           |
+| --------- | -------------- | ---- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Yes       | `withFamilies` | flag | `withFamilies` | On the **first** request only (`cursor` omitted): add `families[]` and replace normal `cards[]` paging with one full card per matching family (see Response). `limit` is ignored. |
-| Yes       | `limit`        | int  | `limit=50`     | Page size for `cards[]` when `withFamilies` is absent (default 50, max 200).                                          |
-| Yes       | `cursor`       | int  | `cursor=10516` | Resume `cards[]` paging after this `card_index`. When set, `withFamilies` is ignored.                                   |
+| Yes       | `limit`        | int  | `limit=50`     | Page size for `cards[]` when `withFamilies` is absent (default 50, max 200).                                                                                                      |
+| Yes       | `cursor`       | int  | `cursor=10516` | Resume `cards[]` paging after this `card_index`. When set, `withFamilies` is ignored.                                                                                             |
 
 
 ## `GET /api/v2/cards` Response
@@ -133,7 +134,7 @@ Requires `withFamilies` and no `cursor`. Adds `families[]` (omitted when `cursor
 | `name`      | object  | Localized character name (locale → string).                                             |
 
 
-`families[]` is not paginated. **`cards[]` contains only the full `CardV2` for each `families[].reference`** (same order; one card per family). `limit` and `iter.cursor` do not apply on this response — use a follow-up request **without** `withFamilies` (and optional `cursor`) to page through all matching prints.
+`families[]` is not paginated. `**cards[]` contains only the full `CardV2` for each `families[].reference**` (same order; one card per family). `limit` and `iter.cursor` do not apply on this response — use a follow-up request **without** `withFamilies` (and optional `cursor`) to page through all matching prints.
 
 ```
 {

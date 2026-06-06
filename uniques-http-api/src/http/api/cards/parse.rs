@@ -137,23 +137,35 @@ fn parse_effect_mode(params: &QueryMultiMap) -> ApiResult<EffectCombineMode> {
     }
 }
 
-/// Parses `effect[N][t|c|o]` keys into ordered slots (sparse indices allowed).
+enum EffectFieldSelector {
+    IdGd(IdGdSelector),
+    MatchCount,
+}
+
+/// Parses `effect[N][t|c|o|matchCount]` keys into ordered slots (sparse indices allowed).
 fn parse_effect_slots(params: &QueryMultiMap) -> ApiResult<Vec<EffectSlotFilter>> {
     let mut by_index: BTreeMap<u32, EffectSlotFilter> = BTreeMap::new();
 
     for key in params.keys() {
-        let Some((index, selector)) = parse_effect_param_key(key)? else {
+        let Some((index, field)) = parse_effect_param_key(key)? else {
             continue;
         };
-        let ids = parse_id_list(params, key)?;
         let slot = by_index.entry(index).or_insert_with(|| EffectSlotFilter {
             index,
             ..EffectSlotFilter::default()
         });
-        match selector {
-            IdGdSelector::T => slot.t = ids,
-            IdGdSelector::C => slot.c = ids,
-            IdGdSelector::O => slot.o = ids,
+        match field {
+            EffectFieldSelector::IdGd(selector) => {
+                let ids = parse_id_list(params, key)?;
+                match selector {
+                    IdGdSelector::T => slot.t = ids,
+                    IdGdSelector::C => slot.c = ids,
+                    IdGdSelector::O => slot.o = ids,
+                }
+            }
+            EffectFieldSelector::MatchCount => {
+                slot.match_count = parse_match_count(params, key)?;
+            }
         }
     }
 
@@ -163,8 +175,21 @@ fn parse_effect_slots(params: &QueryMultiMap) -> ApiResult<Vec<EffectSlotFilter>
         .collect())
 }
 
-/// Returns `None` for keys that are not `effect[N][t|c|o]`.
-fn parse_effect_param_key(key: &str) -> ApiResult<Option<(u32, IdGdSelector)>> {
+fn parse_match_count(params: &QueryMultiMap, key: &str) -> ApiResult<u8> {
+    let raw = get_first(params, key).unwrap_or("1").trim();
+    let value = raw
+        .parse::<u8>()
+        .map_err(|_| bad_request(format!("invalid {key} value '{raw}'")))?;
+    if !(1..=3).contains(&value) {
+        return Err(bad_request(format!(
+            "invalid {key} value '{raw}': expected 1, 2, or 3"
+        )));
+    }
+    Ok(value)
+}
+
+/// Returns `None` for keys that are not `effect[N][t|c|o|matchCount]`.
+fn parse_effect_param_key(key: &str) -> ApiResult<Option<(u32, EffectFieldSelector)>> {
     const PREFIX: &str = "effect[";
     if !key.starts_with(PREFIX) {
         return Ok(None);
@@ -184,22 +209,22 @@ fn parse_effect_param_key(key: &str) -> ApiResult<Option<(u32, IdGdSelector)>> {
     let index = parse_u32("effect slot index", index_str)?;
 
     let field_part = &rest[bracket_end + 1..];
-    if !field_part.starts_with('[') || !field_part.ends_with(']') || field_part.len() != 3 {
-        return Err(bad_request(format!(
-            "invalid effect parameter '{key}': expected effect[N][t], effect[N][c], or effect[N][o]"
-        )));
+    if !field_part.starts_with('[') || !field_part.ends_with(']') {
+        return Err(bad_request(format!("invalid effect parameter '{key}'")));
     }
-    let selector = match &field_part[1..2] {
-        "t" => IdGdSelector::T,
-        "c" => IdGdSelector::C,
-        "o" => IdGdSelector::O,
+    let field_name = &field_part[1..field_part.len() - 1];
+    let field = match field_name {
+        "t" => EffectFieldSelector::IdGd(IdGdSelector::T),
+        "c" => EffectFieldSelector::IdGd(IdGdSelector::C),
+        "o" => EffectFieldSelector::IdGd(IdGdSelector::O),
+        "matchCount" => EffectFieldSelector::MatchCount,
         _ => {
             return Err(bad_request(format!(
-                "invalid effect parameter '{key}': expected [t], [c], or [o]"
+                "invalid effect parameter '{key}': expected [t], [c], [o], or [matchCount]"
             )));
         }
     };
-    Ok(Some((index, selector)))
+    Ok(Some((index, field)))
 }
 
 fn parse_factions(params: &QueryMultiMap) -> ApiResult<Vec<Faction>> {
@@ -567,6 +592,41 @@ mod tests {
         params.insert("effectMode".to_string(), vec!["xor".to_string()]);
         let err = parse_request(state.index().as_ref(), &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn invalid_match_count_rejected() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("effect[0][matchCount]".to_string(), vec!["4".to_string()]);
+        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn parse_match_count_defaults_to_one() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        assert_eq!(req.filters.effects[0].match_count, 1);
+    }
+
+    #[test]
+    fn parse_match_count_two_and_three() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params.insert("effect[0][matchCount]".to_string(), vec!["2".to_string()]);
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        assert_eq!(req.filters.effects[0].match_count, 2);
+
+        let mut params3: QueryMultiMap = HashMap::new();
+        params3.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
+        params3.insert("effect[0][matchCount]".to_string(), vec!["3".to_string()]);
+        let req3 = parse_request(state.index().as_ref(), &params3).unwrap();
+        assert_eq!(req3.filters.effects[0].match_count, 3);
     }
 
     #[test]

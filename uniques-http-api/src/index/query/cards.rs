@@ -51,13 +51,19 @@ pub(crate) fn build_bitmap(state: &UniquesIndex, req: &CardsRequest) -> QueryRes
     let mut groups = Vec::new();
 
     // Each effect[N] searches main lines only (M1/M2/M3) with per-line bucket intersection,
-    // then OR across lines. Multiple slots combine per effectMode (default: and).
+    // then combines lines per matchCount (default 1 = OR). Multiple slots combine per effectMode.
     let effect_bitmaps: Vec<RoaringBitmap> = req
         .filters
         .effects
         .iter()
         .filter_map(|slot| {
-            effect0_bitmap_main_lines(state, &slot.t, &slot.c, &slot.o)
+            effect_slot_bitmap(
+                state,
+                &slot.t,
+                &slot.c,
+                &slot.o,
+                slot.match_count,
+            )
         })
         .collect();
     if let Some(bmp) = combine_effect_bitmaps(&effect_bitmaps, req.filters.effect_mode) {
@@ -186,25 +192,50 @@ fn combine_effect_bitmaps(
     Some(out)
 }
 
-fn effect0_bitmap_main_lines(
+fn effect_slot_bitmap(
     state: &UniquesIndex,
     triggers: &[u32],
     conditions: &[u32],
     outputs: &[u32],
+    match_count: u8,
 ) -> Option<RoaringBitmap> {
     if triggers.is_empty() && conditions.is_empty() && outputs.is_empty() {
         return None;
     }
 
-    let mut out = RoaringBitmap::new();
-    for line in [EffectLine::M1, EffectLine::M2, EffectLine::M3] {
-        if let Some(line_match) =
-            bitmap_intersect_buckets_on_line(state, line, triggers, conditions, outputs)
-        {
-            out |= line_match;
+    let line_matches = [EffectLine::M1, EffectLine::M2, EffectLine::M3].map(|line| {
+        bitmap_intersect_buckets_on_line(state, line, triggers, conditions, outputs)
+    });
+    Some(combine_line_matches(&line_matches, match_count))
+}
+
+fn combine_line_matches(line_matches: &[Option<RoaringBitmap>; 3], match_count: u8) -> RoaringBitmap {
+    match match_count {
+        1 => line_matches
+            .iter()
+            .flatten()
+            .fold(RoaringBitmap::new(), |acc, bmp| acc | bmp),
+        2 => {
+            let mut out = RoaringBitmap::new();
+            for i in 0..3 {
+                for j in i + 1..3 {
+                    if let (Some(a), Some(b)) = (&line_matches[i], &line_matches[j]) {
+                        out |= &(a & b);
+                    }
+                }
+            }
+            out
         }
+        3 => match (
+            &line_matches[0],
+            &line_matches[1],
+            &line_matches[2],
+        ) {
+            (Some(a), Some(b), Some(c)) => a & b & c,
+            _ => RoaringBitmap::new(),
+        },
+        _ => RoaringBitmap::new(),
     }
-    Some(out)
 }
 
 fn bitmap_intersect_buckets_on_line(
@@ -844,6 +875,41 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn match_count_two_requires_two_lines() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["25".to_string()]);
+        params.insert("effect[0][c]".to_string(), vec!["192".to_string()]);
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
+        assert!(bmp.contains(7));
+        assert!(bmp.contains(8));
+        assert_eq!(bmp.len(), 2);
+
+        let mut params2: QueryMultiMap = HashMap::new();
+        params2.insert("effect[0][t]".to_string(), vec!["25".to_string()]);
+        params2.insert("effect[0][c]".to_string(), vec!["192".to_string()]);
+        params2.insert("effect[0][matchCount]".to_string(), vec!["2".to_string()]);
+        let req2 = parse_request(state.index().as_ref(), &params2).unwrap();
+        let bmp2 = build_bitmap(state.index().as_ref(), &req2).unwrap();
+        assert!(bmp2.contains(7));
+        assert!(!bmp2.contains(8));
+        assert_eq!(bmp2.len(), 1);
+    }
+
+    #[test]
+    fn match_count_three_requires_all_main_lines() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("effect[0][t]".to_string(), vec!["25".to_string()]);
+        params.insert("effect[0][c]".to_string(), vec!["192".to_string()]);
+        params.insert("effect[0][matchCount]".to_string(), vec!["3".to_string()]);
+        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let bmp = build_bitmap(state.index().as_ref(), &req).unwrap();
+        assert!(bmp.is_empty());
+    }
 
     #[test]
     fn multiple_effect_slots_combine_with_effect_mode() {

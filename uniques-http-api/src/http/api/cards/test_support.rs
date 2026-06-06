@@ -56,7 +56,7 @@ pub(crate) fn test_state() -> AppState {
         kind: None,
         built_at_secs: 0,
         card_count: 10,
-        id_gd_count: 4,
+        id_gd_count: 6,
         total_bit_span: 10,
         family_count: 1,
     };
@@ -120,6 +120,34 @@ pub(crate) fn test_state() -> AppState {
                 is_main: true,
                 is_echo: false,
             },
+            IdGdCatalogEntry {
+                id_gd: 25,
+                card_count: 2,
+                bitmap_bytes: 0,
+                bitmap_file: "25.roar".to_string(),
+                element_type: "TRIGGER".to_string(),
+                translations: BTreeMap::new(),
+                m1: None,
+                m2: None,
+                m3: None,
+                ec: None,
+                is_main: true,
+                is_echo: false,
+            },
+            IdGdCatalogEntry {
+                id_gd: 192,
+                card_count: 2,
+                bitmap_bytes: 0,
+                bitmap_file: "192.roar".to_string(),
+                element_type: "CONDITION".to_string(),
+                translations: BTreeMap::new(),
+                m1: None,
+                m2: None,
+                m3: None,
+                ec: None,
+                is_main: true,
+                is_echo: false,
+            },
         ],
     };
 
@@ -141,7 +169,11 @@ pub(crate) fn test_state() -> AppState {
 
     let mut id_gd_per_line: BTreeMap<(u32, EffectLine), RoaringBitmap> = BTreeMap::new();
     id_gd_per_line.insert((24, EffectLine::M2), RoaringBitmap::from_iter([2, 5]));
+    id_gd_per_line.insert((25, EffectLine::M1), RoaringBitmap::from_iter([7, 8]));
+    id_gd_per_line.insert((25, EffectLine::M2), RoaringBitmap::from_iter([7]));
     id_gd_per_line.insert((191, EffectLine::M1), RoaringBitmap::from_iter([5]));
+    id_gd_per_line.insert((192, EffectLine::M1), RoaringBitmap::from_iter([7, 8]));
+    id_gd_per_line.insert((192, EffectLine::M2), RoaringBitmap::from_iter([7]));
     id_gd_per_line.insert((42, EffectLine::Ec), RoaringBitmap::from_iter([5]));
     id_gd_per_line.insert((90, EffectLine::M1), RoaringBitmap::from_iter([2]));
 

@@ -108,12 +108,25 @@ pub(crate) enum EffectCombineMode {
     Or,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct EffectSlotFilter {
     pub(crate) index: u32,
     pub(crate) t: Vec<u32>,
     pub(crate) c: Vec<u32>,
     pub(crate) o: Vec<u32>,
+    pub(crate) match_count: u8,
+}
+
+impl Default for EffectSlotFilter {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            t: Vec::new(),
+            c: Vec::new(),
+            o: Vec::new(),
+            match_count: 1,
+        }
+    }
 }
 
 impl EffectSlotFilter {
