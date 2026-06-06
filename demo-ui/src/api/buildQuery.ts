@@ -91,6 +91,9 @@ function appendFilterParams(
     appendEffectField(params, effectIndex, 't', slot.t);
     appendEffectField(params, effectIndex, 'c', slot.c);
     appendEffectField(params, effectIndex, 'o', slot.o);
+    if (slot.matchCount !== 1) {
+      params.set(`effect[${effectIndex}][matchCount]`, String(slot.matchCount));
+    }
     effectIndex += 1;
   }
 

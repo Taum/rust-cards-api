@@ -2,6 +2,17 @@ export type EffectSlot = {
   t: string;
   c: string;
   o: string;
+  /** How many main-effect lines (M1/M2/M3) must match; sent as `effect[N][matchCount]`. */
+  matchCount: MatchCount;
+};
+
+export type MatchCount = 1 | 2 | 3;
+
+export const EMPTY_EFFECT_SLOT: EffectSlot = {
+  t: '',
+  c: '',
+  o: '',
+  matchCount: 1,
 };
 
 /** One row from `GET /api/v2/effects`. */
@@ -64,9 +75,9 @@ export const SOURCE_SETS = [
 export type SourceSetCode = (typeof SOURCE_SETS)[number];
 
 export const DEFAULT_FILTER_STATE: FilterState = {
-  effects: [{ t: '', c: '', o: '' }],
+  effects: [{ ...EMPTY_EFFECT_SLOT }],
   effectMode: 'and',
-  support: { t: '', c: '', o: '' },
+  support: { t: '', c: '', o: '', matchCount: 1 },
   factions: [],
   sets: [],
   reference: '',

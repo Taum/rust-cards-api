@@ -1,6 +1,7 @@
 import { activeEffectSlotCount } from '../api/buildQuery';
 import type { CardLocale } from '../locale';
 import {
+  EMPTY_EFFECT_SLOT,
   FACTIONS,
   SOURCE_SETS,
   type EffectMode,
@@ -46,7 +47,7 @@ export function FilterPanel({
 
   const addEffectSlot = () => {
     setFilters({
-      effects: [...filters.effects, { t: '', c: '', o: '' }],
+      effects: [...filters.effects, { ...EMPTY_EFFECT_SLOT }],
     });
   };
 

@@ -12,6 +12,7 @@ import type {
   EffectSlot,
   EffectsCatalogResponse,
   FilterState,
+  MatchCount,
 } from '../types';
 import { EffectIdCombobox } from './EffectIdCombobox';
 import { EffectSlotSelectionSummary } from './EffectSlotSelectionSummary';
@@ -48,8 +49,12 @@ export function EffectSlotFields({
 }: EffectSlotFieldsProps) {
   const heading =
     title ?? (slotIndex !== undefined ? `Effect [${slotIndex}]` : 'Effect');
-  const update = (field: keyof EffectSlot, value: string) => {
+  const update = (field: 't' | 'c' | 'o', value: string) => {
     onChange({ ...slot, [field]: value });
+  };
+
+  const updateMatchCount = (matchCount: MatchCount) => {
+    onChange({ ...slot, matchCount });
   };
 
   const [focusedPart, setFocusedPart] = useState<EffectPart | null>(null);
@@ -94,15 +99,35 @@ export function EffectSlotFields({
     <div className="overflow-visible rounded-lg border border-slate-700 bg-slate-900/60 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-slate-200">{heading}</h3>
-        {removable && onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-red-300"
-          >
-            Remove
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {region === 'main' && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-400">
+              <span className="whitespace-nowrap">Lines</span>
+              <select
+                value={slot.matchCount}
+                onChange={(e) =>
+                  updateMatchCount(Number(e.target.value) as MatchCount)
+                }
+                aria-label="Match count"
+                title="Require this many main-effect lines (M1, M2, M3) to match"
+                className="rounded border border-slate-600 bg-slate-950 px-1.5 py-1 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
+              >
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+            </label>
+          )}
+          {removable && onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-red-300"
+            >
+              Remove
+            </button>
+          )}
+        </div>
       </div>
       <div className="grid gap-2 overflow-visible sm:grid-cols-3">
         <EffectIdCombobox
