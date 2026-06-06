@@ -35,13 +35,31 @@ Access the demo at https://taum.github.io/rust-cards-api/
 
 Follow instructions at [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
 
-2. Run or build from the repository root
+2. Install [just](https://github.com/casey/just) (task runner; optional but recommended)
 
-This repo is a Cargo workspace. Run commands from the root directory:
+```bash
+cargo install just
+```
+
+On Windows you can also use `winget install Casey.Just`. The [`justfile`](justfile) uses Git for Windows bash as its shell — install [Git for Windows](https://git-scm.com/download/win) if `just` reports that `sh` is missing.
+
+3. Run from the repository root
+
+Common tasks via `just`:
+
+```bash
+just              # list available commands
+just api          # build and run the HTTP API (release)
+just demo-ui      # run the Vite demo UI dev server
+```
+
+The API reads `uniques-http-api/.env.local` (copy from [`.env.local.template`](uniques-http-api/.env.local.template)). You need a merged index at `build/full_index/ALL_SETS` before the API can start — see [CLI Reference](./docs/cli-reference.md) and `just` recipes under `4-production`.
+
+Equivalent Cargo commands:
 
 ```
+cargo run -p uniques-http-api --release
 cargo run -p cli-indexer -- --help
-cargo run -p uniques-http-api
 ```
 
 Or build release binaries:
