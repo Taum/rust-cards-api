@@ -1,6 +1,7 @@
 ## Multi-stage build for Cloud Run.
 ##
 ## Build context must include:
+## - Cargo.toml, Cargo.lock (workspace root)
 ## - uniques-http-api/
 ## - alt-indexer/
 ## - alt-indexer/full_index/ALL_SETS (embedded into the image)
@@ -12,11 +13,12 @@ FROM rust:1.86-bookworm AS builder
 
 WORKDIR /app
 
-# Copy only the crates needed to build the binary (alt-indexer is a path dependency).
+# Copy workspace manifest and crates (alt-indexer is a path dependency).
+COPY Cargo.toml Cargo.lock ./
 COPY alt-indexer/ ./alt-indexer/
 COPY uniques-http-api/ ./uniques-http-api/
 
-RUN cargo build --release --manifest-path uniques-http-api/Cargo.toml
+RUN cargo build --release -p uniques-http-api
 
 
 FROM debian:bookworm-slim AS runtime
@@ -32,7 +34,7 @@ ENV PORT=8080
 
 WORKDIR /app
 
-COPY --from=builder /app/uniques-http-api/target/release/uniques-http-api /app/uniques-http-api
+COPY --from=builder /app/target/release/uniques-http-api /app/uniques-http-api
 COPY alt-indexer/full_index/ALL_SETS /opt/index/ALL_SETS
 
 RUN chown -R app:app /app /opt/index

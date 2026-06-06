@@ -2,6 +2,10 @@
 
 Project-wide notes for AI agents working in this repo.
 
+## Cargo workspace
+
+The repository root [`Cargo.toml`](Cargo.toml) is a workspace with members `alt-indexer` and `uniques-http-api`. Run `cargo build`, `cargo test`, and `cargo run -p <crate>` from the repo root. Build output goes to `target/` at the root (not under individual crate directories).
+
 ## Index layout (`alt-indexer/full_index/`)
 
 This directory is gitignored (not committed) but present on disk and readable.

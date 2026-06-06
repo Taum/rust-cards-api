@@ -34,28 +34,24 @@ Access the demo at https://taum.github.io/rust-cards-api/
 
 Follow instructions at [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
 
-1. Run or build sub-project
+2. Run or build from the repository root
 
-First go to the sub-project you want to work with:
-
-```
-cd alt-indexer
-```
-
-Then you can either "run" (compile & run)
+This repo is a Cargo workspace. Run commands from the root directory:
 
 ```
-cargo run -- --help
+cargo run -p alt-indexer -- --help
+cargo run -p uniques-http-api
 ```
 
-Or "build" the project for release, before running it:
+Or build release binaries:
 
 ```
 cargo build --release
-.\target\release\alt-indexer.exe --help # adjust to match your OS
+.\target\release\alt-indexer.exe --help   # adjust to match your OS
+.\target\release\uniques-http-api.exe
 ```
 
-See [CLI Reference](./docs/cli-reference.md) for Command Line examples.
+See [CLI Reference](./docs/cli-reference.md) for command-line examples.
 
 ## Deployment
 

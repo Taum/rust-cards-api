@@ -4,10 +4,10 @@ This page lists every command-line interface exposed by this repository.
 
 | Tool | How to run | Interface |
 |------|------------|-----------|
-| **`alt-indexer`** | `cargo run --manifest-path alt-indexer/Cargo.toml -- …` (from repo root), or `cargo run` inside `alt-indexer/` | Subcommands + flags (clap) |
-| **`uniques-http-api`** | `cargo run --manifest-path uniques-http-api/Cargo.toml`, or `cargo run` inside `uniques-http-api/` | Environment variables only (no subcommands) |
+| **`alt-indexer`** | `cargo run -p alt-indexer -- …` (from repo root) | Subcommands + flags (clap) |
+| **`uniques-http-api`** | `cargo run -p uniques-http-api` (from repo root) | Environment variables only (no subcommands) |
 
-There is no workspace `Cargo.toml` at the repository root; each crate is built from its own manifest.
+The repository root [`Cargo.toml`](../Cargo.toml) is a Cargo workspace; both crates share one `Cargo.lock` and build into `target/` at the root.
 
 For narrative context, see [Architecture overview](architecture.md).
 
@@ -18,8 +18,8 @@ For narrative context, see [Architecture overview](architecture.md).
 Binary crate in [`alt-indexer/`](../alt-indexer/). Indexes Equinox-style Unique card JSON into Roaring bitmaps, `cards.bin`, and related metadata.
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- --help
-cargo run --manifest-path alt-indexer/Cargo.toml -- <SUBCOMMAND> --help
+cargo run -p alt-indexer -- --help
+cargo run -p alt-indexer -- <SUBCOMMAND> --help
 ```
 
 Global options: `-h`, `--help` only (no global flags).
@@ -28,19 +28,19 @@ Global options: `-h`, `--help` only (no global flags).
 
 ```bash
 # 1. Build one set index
-cargo run --manifest-path alt-indexer/Cargo.toml -- build \
+cargo run -p alt-indexer -- build \
   --root /path/to/equinox-cards/cards-unique-COREKS \
   --set COREKS \
   --out ./full_index
 
 # 2. Repeat for other sets, then merge
-cargo run --manifest-path alt-indexer/Cargo.toml -- merge \
+cargo run -p alt-indexer -- merge \
   --index-dir ./full_index \
   --sets COREKS,CORE,ALIZE \
   --out ./full_index/ALL_SETS
 
 # 3. Inspect
-cargo run --manifest-path alt-indexer/Cargo.toml -- query \
+cargo run -p alt-indexer -- query \
   --index-dir ./full_index \
   --set ALL_SETS \
   --id-gd 24,191 \
@@ -70,7 +70,7 @@ Crawl a dataset directory and write a per-set index under `<out>/<SET>/`.
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- build \
+cargo run -p alt-indexer -- build \
   --root "../equinox-cards/cards-unique-COREKS" \
   --set COREKS \
   --out ./full_index \
@@ -93,7 +93,7 @@ Map a global **`card_index`** (bit position) back to a card reference using `cat
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- decode \
+cargo run -p alt-indexer -- decode \
   --catalog ./full_index/ALL_SETS/catalog.json \
   --bit 42
 ```
@@ -133,16 +133,16 @@ Query an existing index directory. You must pass **either** `--id-gd` **or** `--
 
 ```bash
 # Count cards matching idGd 24 (table output if --list given)
-cargo run --manifest-path alt-indexer/Cargo.toml -- query \
+cargo run -p alt-indexer -- query \
   --index-dir ./full_index --set ALL_SETS --id-gd 24
 
 # Multi-idGd query with effect text
-cargo run --manifest-path alt-indexer/Cargo.toml -- query \
+cargo run -p alt-indexer -- query \
   --index-dir ./full_index --set ALL_SETS \
   --id-gd 24,191,76 --show-effect --list 5 --locale fr_FR
 
 # Single card by reference
-cargo run --manifest-path alt-indexer/Cargo.toml -- query \
+cargo run -p alt-indexer -- query \
   --index-dir ./full_index --set ALL_SETS \
   --refid ALT_COREKS_B_AX_04_U_10
 ```
@@ -162,7 +162,7 @@ Merge two or more **existing** per-set indexes into one global index. Output fil
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- merge \
+cargo run -p alt-indexer -- merge \
   --index-dir ./full_index \
   --sets COREKS,CORE,ALIZE,BISE \
   --out ./full_index/ALL_SETS
@@ -188,7 +188,7 @@ Register a card-list Roaring filter on an existing index from a refs file.
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- add-extra-filter \
+cargo run -p alt-indexer -- add-extra-filter \
   --index-dir ./full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned.txt \
@@ -196,7 +196,7 @@ cargo run --manifest-path alt-indexer/Cargo.toml -- add-extra-filter \
   --negated
 
 # Update the same filter in place
-cargo run --manifest-path alt-indexer/Cargo.toml -- add-extra-filter \
+cargo run -p alt-indexer -- add-extra-filter \
   --index-dir ./full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned-v2.txt \
@@ -218,7 +218,7 @@ Report cards that are allocated in the catalog bit span but missing or invalid i
 **Example**
 
 ```bash
-cargo run --manifest-path alt-indexer/Cargo.toml -- audit-missing \
+cargo run -p alt-indexer -- audit-missing \
   --index-dir ./full_index \
   --set COREKS \
   --json
@@ -259,7 +259,7 @@ Use a **release** build for meaningful timings: `cargo build --release -p alt-in
 
 ```bash
 cargo build --release -p alt-indexer
-./alt-indexer/target/release/alt-indexer bench-query \
+./target/release/alt-indexer bench-query \
   --index-dir ./alt-indexer/full_index \
   --set ALL_SETS \
   --queries 10000 \
@@ -275,7 +275,7 @@ cargo build --release -p alt-indexer
 HTTP server in [`uniques-http-api/`](../uniques-http-api/). It has **no CLI flags**; configuration is via environment variables (and optional `.env` / `.env.local` in that crate’s directory).
 
 ```bash
-cargo run --manifest-path uniques-http-api/Cargo.toml
+cargo run -p uniques-http-api
 ```
 
 ### Environment variables
