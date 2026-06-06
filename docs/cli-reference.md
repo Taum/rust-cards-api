@@ -31,17 +31,17 @@ Global options: `-h`, `--help` only (no global flags).
 cargo run -p cli-indexer -- build \
   --root /path/to/equinox-cards/cards-unique-COREKS \
   --set COREKS \
-  --out ./full_index
+  --out ./build/sets_index
 
 # 2. Repeat for other sets, then merge
 cargo run -p cli-indexer -- merge \
-  --index-dir ./full_index \
+  --index-dir ./build/sets_index \
   --sets COREKS,CORE,ALIZE \
-  --out ./full_index/ALL_SETS
+  --out ./build/full_index/ALL_SETS
 
 # 3. Inspect
 cargo run -p cli-indexer -- query \
-  --index-dir ./full_index \
+  --index-dir ./build/full_index \
   --set ALL_SETS \
   --id-gd 24,191 \
   --list 10
@@ -73,7 +73,7 @@ Crawl a dataset directory and write a per-set index under `<out>/<SET>/`.
 cargo run -p cli-indexer -- build \
   --root "../equinox-cards/cards-unique-COREKS" \
   --set COREKS \
-  --out ./full_index \
+  --out ./build/sets_index \
   --profile
 ```
 
@@ -94,7 +94,7 @@ Map a global **`card_index`** (bit position) back to a card reference using `cat
 
 ```bash
 cargo run -p cli-indexer -- decode \
-  --catalog ./full_index/ALL_SETS/catalog.json \
+  --catalog ./build/full_index/ALL_SETS/catalog.json \
   --bit 42
 ```
 
@@ -108,7 +108,7 @@ Query an existing index directory. You must pass **either** `--id-gd` **or** `--
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `--index-dir <PATH>` | yes | Parent of set folders (e.g. `./full_index`) |
+| `--index-dir <PATH>` | yes | Parent of set folders (e.g. `./build/sets_index` for per-set indexes, `./build/full_index` for merged `ALL_SETS`) |
 | `--set <NAME>` | yes | Set or merged folder name (e.g. `COREKS`, `ALL_SETS`) |
 | `--id-gd <IDS>` | one of | Comma-separated idGd values (e.g. `24,191,76`) |
 | `--refid <REF>` | one of | Single card reference (e.g. `ALT_COREKS_B_AX_04_U_10`) |
@@ -134,16 +134,16 @@ Query an existing index directory. You must pass **either** `--id-gd` **or** `--
 ```bash
 # Count cards matching idGd 24 (table output if --list given)
 cargo run -p cli-indexer -- query \
-  --index-dir ./full_index --set ALL_SETS --id-gd 24
+  --index-dir ./build/full_index --set ALL_SETS --id-gd 24
 
 # Multi-idGd query with effect text
 cargo run -p cli-indexer -- query \
-  --index-dir ./full_index --set ALL_SETS \
+  --index-dir ./build/full_index --set ALL_SETS \
   --id-gd 24,191,76 --show-effect --list 5 --locale fr_FR
 
 # Single card by reference
 cargo run -p cli-indexer -- query \
-  --index-dir ./full_index --set ALL_SETS \
+  --index-dir ./build/full_index --set ALL_SETS \
   --refid ALT_COREKS_B_AX_04_U_10
 ```
 
@@ -157,15 +157,15 @@ Merge two or more **existing** per-set indexes into one global index. Output fil
 |--------|----------|-------------|
 | `--index-dir <PATH>` | yes | Directory containing `<SET>/catalog.json` for each source set |
 | `--sets <LIST>` | yes | Comma-separated set codes in **precedence order** (overlap grouping and tie-breaking) |
-| `--out <PATH>` | yes | Output folder for the merged index (e.g. `./full_index/ALL_SETS`) |
+| `--out <PATH>` | yes | Output folder for the merged index (e.g. `./build/full_index/ALL_SETS`) |
 
 **Example**
 
 ```bash
 cargo run -p cli-indexer -- merge \
-  --index-dir ./full_index \
+  --index-dir ./build/sets_index \
   --sets COREKS,CORE,ALIZE,BISE \
-  --out ./full_index/ALL_SETS
+  --out ./build/full_index/ALL_SETS
 ```
 
 See [ALL_SETS index format](ALL_SETS-index-format.md) for merge ordering and on-disk layout.
@@ -189,7 +189,7 @@ Register a card-list Roaring filter on an existing index from a refs file.
 
 ```bash
 cargo run -p cli-indexer -- add-extra-filter \
-  --index-dir ./full_index/ALL_SETS \
+  --index-dir ./build/full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned.txt \
   --type property \
@@ -197,7 +197,7 @@ cargo run -p cli-indexer -- add-extra-filter \
 
 # Update the same filter in place
 cargo run -p cli-indexer -- add-extra-filter \
-  --index-dir ./full_index/ALL_SETS \
+  --index-dir ./build/full_index/ALL_SETS \
   --filter-id exclude-banned \
   --refs-file ./lists/banned-v2.txt \
   --replace
@@ -219,7 +219,7 @@ Report cards that are allocated in the catalog bit span but missing or invalid i
 
 ```bash
 cargo run -p cli-indexer -- audit-missing \
-  --index-dir ./full_index \
+  --index-dir ./build/sets_index \
   --set COREKS \
   --json
 ```
@@ -260,7 +260,7 @@ Use a **release** build for meaningful timings: `cargo build --release -p cli-in
 ```bash
 cargo build --release -p cli-indexer
 ./target/release/cli-indexer bench-query \
-  --index-dir ./cli-indexer/full_index \
+  --index-dir ./build/full_index \
   --set ALL_SETS \
   --queries 10000 \
   --multi-ids 6-12 \
@@ -282,7 +282,7 @@ cargo run -p uniques-http-api
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `INDEX_PATH` | **yes** | — | Path to the index folder itself (e.g. `../cli-indexer/full_index/ALL_SETS`) |
+| `INDEX_PATH` | **yes** | — | Path to the index folder itself (e.g. `../build/full_index/ALL_SETS`) |
 | `PORT` | no | `8080` | TCP port; bind address is always `0.0.0.0` |
 
 **Local development**
@@ -291,7 +291,7 @@ Copy [`uniques-http-api/.env.example`](../uniques-http-api/.env.example) to `.en
 
 ```env
 PORT=8234
-INDEX_PATH=../cli-indexer/full_index/ALL_SETS
+INDEX_PATH=../build/full_index/ALL_SETS
 ```
 
 `load_env()` loads `.env` first, then **overrides** with `.env.local`.

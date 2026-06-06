@@ -5,10 +5,10 @@ This document specifies the on-disk format written by the `cli-indexer` tool for
 The merged index is produced by:
 
 ```text
-cli-indexer build --root "..\path\to\equinox-cards\cards-unique-CORE" --set CORE --out ./full_index
-cli-indexer build --root "..\path\to\equinox-cards\cards-unique-COREKS" --set COREKS --out ./full_index
+cli-indexer build --root "..\path\to\equinox-cards\cards-unique-CORE" --set CORE --out ./build/sets_index
+cli-indexer build --root "..\path\to\equinox-cards\cards-unique-COREKS" --set COREKS --out ./build/sets_index
 ...
-cli-indexer merge --index-dir ./full_index --sets COREKS,CORE,... --out ./final_index/ALL_SETS
+cli-indexer merge --index-dir ./build/sets_index --sets COREKS,CORE,... --out ./build/full_index/ALL_SETS
 ```
 
 The **merged set name** is the final path component of `--out` (e.g. `ALL_SETS`). All files described below are written **directly under that folder**.

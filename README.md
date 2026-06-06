@@ -58,4 +58,4 @@ See [CLI Reference](./docs/cli-reference.md) for command-line examples.
 
 A [Dockerfile](./Dockerfile) builds the HTTP server image with embedded index.
 
-The expected process is to build the index first (into `cli-indexer/full_index`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.
+The expected process is to build the index first (per-set output in `build/sets_index/`, merged output in `build/full_index/ALL_SETS`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.

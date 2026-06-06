@@ -10,7 +10,7 @@ There is no runtime dependency from `cli-indexer` on the HTTP API. The HTTP crat
 - **Config**: copy `uniques-http-api/.env.example` to `.env` (optional shared defaults), then create `.env.local` from `.env.local.template` for local overrides.
 - **Defaults**:
   - `PORT=8234` (local dev)
-  - `INDEX_PATH=../cli-indexer/full_index/ALL_SETS`
+  - `INDEX_PATH=../build/full_index/ALL_SETS`
 
 Run:
 
@@ -30,7 +30,7 @@ curl http://127.0.0.1:8234/healthz
 
 The repo-root `Dockerfile` expects this directory to exist in the build context:
 
-- `cli-indexer/full_index/ALL_SETS`
+- `build/full_index/ALL_SETS`
 
 Build:
 

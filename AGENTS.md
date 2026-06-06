@@ -10,17 +10,15 @@ The repository root [`Cargo.toml`](Cargo.toml) is a workspace with members `inde
 - **`cli-indexer`**: CLI binary (`build`, `merge`, `query`, etc.) — thin wrapper over `index-core`.
 - **`uniques-http-api`**: HTTP server; depends on `index-core` for index types and query helpers.
 
-## Index layout (`cli-indexer/full_index/`)
+## Index layout (`build/`)
 
-This directory is gitignored (not committed) but present on disk and readable.
+Both directories below are gitignored (not committed) but present on disk and readable.
 
-- **`cli-indexer/full_index/ALL_SETS`** is the index to use. It is the **merged** index
-  (`manifest.json` → `"kind": "merge"`) combining all single-set indexes into one
-  global bit space. This is what `uniques-http-api` loads by default
-  (`INDEX_PATH=./cli-indexer/full_index/ALL_SETS`, see `uniques-http-api/.env.local`).
-- The sibling folders (`CORE`, `COREKS`, `ALIZE`, `BISE`, `CYCLONE`, `DUSTER`, `EOLE`)
-  are **single-set** indexes produced by `cli-indexer build`. The `merge` subcommand
-  combines them into `ALL_SETS`.
+- **`build/full_index/ALL_SETS`** is the merged index to use (`manifest.json` → `"kind": "merge"`).
+  This is what `uniques-http-api` loads by default
+  (`INDEX_PATH=./build/full_index/ALL_SETS`, see `uniques-http-api/.env.local`).
+- **`build/sets_index/`** holds per-set indexes (`CORE`, `COREKS`, `ALIZE`, `BISE`, `CYCLONE`, `DUSTER`, `EOLE`, …)
+  produced by `cli-indexer build`. The `merge` subcommand combines them into `build/full_index/ALL_SETS`.
 
 Current `ALL_SETS` stats (from `manifest.json`): ~5,455,928 cards (`total_bit_span`),
 527 families, 818 distinct `idGd` effect parts.
@@ -34,6 +32,6 @@ space is small: `id_gd_count` = 818.
 ## Reading gitignored files
 
 `Glob` and the codebase search tools respect `.gitignore`, so they will not surface files
-under `full_index/`. Use `Read` with an explicit path, or PowerShell `Get-ChildItem` /
+under `build/full_index/` or `build/sets_index/`. Use `Read` with an explicit path, or PowerShell `Get-ChildItem` /
 `Get-Content`, to inspect the index. (Shell here is PowerShell on Windows — use PS syntax,
 not `2>/dev/null`.)

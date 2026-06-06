@@ -14,7 +14,7 @@ Demo UI is Published at `https://taum.github.io/rust-cards-api/`.
 cargo run -p uniques-http-api
 ```
 
-Uses `INDEX_PATH=../cli-indexer/full_index/ALL_SETS` and port **8234** by default (see `uniques-http-api/.env.local`).
+Uses `INDEX_PATH=../build/full_index/ALL_SETS` and port **8234** by default (see `uniques-http-api/.env.local`).
 
 **Terminal 2 — Demo UI**:
 

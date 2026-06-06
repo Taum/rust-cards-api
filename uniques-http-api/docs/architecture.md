@@ -4,9 +4,9 @@ This document describes how **uniques-http-api** is structured.
 
 ### Index on disk
 
-Production and local dev use the merged index at `cli-indexer/full_index/ALL_SETS` (see repo `AGENTS.md`). It combines all sets (`CORE`, `COREKS`, `ALIZE`, …) into one global bit space.
+Production and local dev use the merged index at `build/full_index/ALL_SETS` (see repo `AGENTS.md`). It combines all sets (`CORE`, `COREKS`, `ALIZE`, …) into one global bit space.
 
-At startup, `INDEX_PATH` (default in `.env.local`: `./cli-indexer/full_index/ALL_SETS`) points at that directory. The loader reads every referenced file into memory once; then responds to requests only from the data loaded into memory.
+At startup, `INDEX_PATH` (default in `.env.local`: `../build/full_index/ALL_SETS`) points at that directory. The loader reads every referenced file into memory once; then responds to requests only from the data loaded into memory.
 
 ## Overview
 
