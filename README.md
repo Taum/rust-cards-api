@@ -41,7 +41,7 @@ Follow instructions at [https://rust-lang.org/tools/install/](https://rust-lang.
 cargo install just
 ```
 
-On Windows you can also use `winget install Casey.Just`. The [`justfile`](justfile) uses Git for Windows bash as its shell — install [Git for Windows](https://git-scm.com/download/win) if `just` reports that `sh` is missing.
+On Windows you can also use `winget install Casey.Just`.
 
 3. Run from the repository root
 

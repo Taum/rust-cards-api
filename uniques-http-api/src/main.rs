@@ -13,10 +13,10 @@ async fn main() -> anyhow::Result<()> {
         .context("INDEX_PATH must point at the merged index directory (e.g. .../ALL_SETS)")?;
 
     let state = Arc::new(load_index(Path::new(&index_path))?);
-    spawn_hot_reload(
-        Arc::clone(&state),
-        DiskIndexSource::new(PathBuf::from(&index_path)),
-    );
+    // spawn_hot_reload(
+    //     Arc::clone(&state),
+    //     DiskIndexSource::new(PathBuf::from(&index_path)),
+    // );
     let app = app(state);
 
     let port: u16 = std::env::var("PORT")

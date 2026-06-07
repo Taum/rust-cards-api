@@ -18,9 +18,13 @@ api:
     cargo run -p uniques-http-api --release
 
 # Run the demo UI dev server (Vite; expects API at uniques-http-api/.env.local).
-[group('1-run')]
+[group('1-run'), unix]
 demo-ui:
     cd demo-ui && npm run dev
+# Run the demo UI dev server (Vite; expects API at uniques-http-api/.env.local).
+[group('1-run'), windows]
+demo-ui:
+    Set-Location demo-ui; npm run dev
 
 # Passthrough to cli-indexer (release). Example: just cli build --help
 [group('1-run')]
@@ -89,3 +93,4 @@ index-merge sets="COREKS,CORE,ALIZE,BISE,CYCLONE,DUSTER,EOLE":
 [group('4-production')]
 docker:
     docker build -t uniques-http-api .
+    
