@@ -92,7 +92,7 @@ index-merge sets="COREKS,CORE,ALIZE,BISE,CYCLONE,DUSTER,EOLE":
 # Compress the full index into a single .tar.zst file.
 [group('4-production'), unix]
 compress-index:
-    tar -I zstd -C build/full_index/ALL_SETS -cvf build/full_index.tar.zst .
+    tar -C build/full_index/ALL_SETS -I "zstd -19" --transform 's,^\./,,' -cvf build/full_index.tar.zst .
 
 # Build the Cloud Run Docker image (requires build/full_index/ALL_SETS on disk).
 [group('4-production')]

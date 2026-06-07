@@ -18,6 +18,8 @@ uuid = { version = "1.17.0", features = ["serde", "v4"] }
 async-trait = "0.1"
 url = "2"
 unicode-normalization = "0.1"
+tar = "0.4"
+zstd = "0.13"
 
 [dev-dependencies]
 testcontainers = "0.23"
@@ -27,3 +29,5 @@ tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 serde_json.workspace = true
 uuid = { version = "1.17.0", features = ["v4"] }
+tar = "0.4"
+zstd = "0.13"

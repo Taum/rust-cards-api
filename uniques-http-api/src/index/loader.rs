@@ -1,16 +1,15 @@
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use index_core::bitmap::{BitmapStore, EffectLine};
+use anyhow::{bail, Context, Result};
+use index_core::bitmap::EffectLine;
 use index_core::catalog::Catalog;
-use index_core::path::ParsedCardPath;
 use index_core::compact::RECORD_SIZE;
 use index_core::faction_index::Faction;
 use index_core::idgd_catalog::IdGdCatalog;
+use index_core::path::ParsedCardPath;
 use index_core::stat_index::StatField;
-use anyhow::{bail, Context, Result};
 use roaring::RoaringBitmap;
 use serde::Deserialize;
 use unicode_normalization::UnicodeNormalization;
@@ -18,6 +17,16 @@ use unicode_normalization::UnicodeNormalization;
 use crate::http::api::effects::{build_effects_list, serialize_effects_list};
 use crate::http::state::AppState;
 use crate::index::UniquesIndex;
+
+pub mod archive;
+pub mod disk;
+pub mod storage;
+
+pub use disk::DiskIndexStorage;
+pub use storage::IndexStorage;
+
+use archive::TarZstIndexStorage;
+use storage::{read_json, read_roar, read_roar_id_gd};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct IndexManifest {
@@ -257,34 +266,86 @@ pub fn build_name_search_index(catalog: &Catalog) -> NameSearchIndex {
     NameSearchIndex { by_family }
 }
 
-/// Read only `manifest.json` from an index directory (cheap hot-reload poll step).
-pub fn read_manifest(index_dir: &Path) -> Result<IndexManifest> {
-    load_json(&index_dir.join("manifest.json"))
+pub enum AnyIndexStorage {
+    Disk(DiskIndexStorage),
+    Archive(TarZstIndexStorage),
 }
 
-/// Eagerly load the full merged index directory into memory.
-pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
-    let index_dir = index_dir
-        .canonicalize()
-        .with_context(|| format!("resolve index path {}", index_dir.display()))?;
+impl IndexStorage for AnyIndexStorage {
+    fn source_path(&self) -> &Path {
+        match self {
+            Self::Disk(storage) => storage.source_path(),
+            Self::Archive(storage) => storage.source_path(),
+        }
+    }
+
+    fn read_bytes(&self, relative_path: &str) -> Result<Vec<u8>> {
+        match self {
+            Self::Disk(storage) => storage.read_bytes(relative_path),
+            Self::Archive(storage) => storage.read_bytes(relative_path),
+        }
+    }
+
+    fn has_file(&self, relative_path: &str) -> bool {
+        match self {
+            Self::Disk(storage) => storage.has_file(relative_path),
+            Self::Archive(storage) => storage.has_file(relative_path),
+        }
+    }
+}
+
+pub fn open_index_storage(path: &Path) -> Result<AnyIndexStorage> {
+    if path.is_dir() {
+        Ok(AnyIndexStorage::Disk(DiskIndexStorage::new(path)?))
+    } else if is_tar_zst(path) {
+        Ok(AnyIndexStorage::Archive(TarZstIndexStorage::open(path)?))
+    } else {
+        bail!(
+            "INDEX_PATH must be a directory or a .tar.zst file (got {})",
+            path.display()
+        )
+    }
+}
+
+fn is_tar_zst(path: &Path) -> bool {
+    path.extension().is_some_and(|ext| ext == "zst")
+        && path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .is_some_and(|stem| stem.ends_with(".tar"))
+}
+
+/// Read only `manifest.json` (cheap hot-reload poll step).
+pub fn read_manifest_from(storage: &impl IndexStorage) -> Result<IndexManifest> {
+    read_json(storage, "manifest.json")
+}
+
+/// Read only `manifest.json` from an on-disk index directory.
+pub fn read_manifest(index_dir: &Path) -> Result<IndexManifest> {
+    read_manifest_from(&DiskIndexStorage::new(index_dir)?)
+}
+
+/// Eagerly load the full index from storage into memory.
+pub fn load_uniques_index_from(storage: &impl IndexStorage) -> Result<UniquesIndex> {
+    let index_dir = storage.source_path().to_path_buf();
 
     eprintln!("loading index from {}", index_dir.display());
 
-    let catalog = Catalog::load(&index_dir.join("catalog.json"))
-        .with_context(|| "load catalog.json")?;
+    let catalog: Catalog = read_json(storage, "catalog.json").with_context(|| "load catalog.json")?;
     eprintln!(
         "  catalog: {} families, total_bit_span={}",
         catalog.families.len(),
         catalog.total_bit_span
     );
 
-    let manifest = load_json(&index_dir.join("manifest.json"))?;
-    let idgd_catalog: IdGdCatalog = load_json(&index_dir.join("idgd_catalog.json"))?;
-    let stats_summary: StatsSummary = load_json(&index_dir.join("stats_summary.json"))?;
-    let factions_summary: FactionsSummary = load_json(&index_dir.join("factions_summary.json"))?;
+    let manifest: IndexManifest = read_json(storage, "manifest.json")?;
+    let idgd_catalog: IdGdCatalog = read_json(storage, "idgd_catalog.json")?;
+    let stats_summary: StatsSummary = read_json(storage, "stats_summary.json")?;
+    let factions_summary: FactionsSummary = read_json(storage, "factions_summary.json")?;
 
-    let cards_path = index_dir.join("cards.bin");
-    let cards = fs::read(&cards_path).with_context(|| format!("read {}", cards_path.display()))?;
+    let cards = storage
+        .read_bytes("cards.bin")
+        .with_context(|| format!("read cards.bin from {}", index_dir.display()))?;
     let expected_len = UniquesIndex::expected_cards_len(catalog.total_bit_span);
     if cards.len() as u64 != expected_len {
         bail!(
@@ -295,16 +356,16 @@ pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
     }
     eprintln!("  cards.bin: {} bytes", cards.len());
 
-    let id_gd_whole = load_id_gd_whole(&index_dir, &idgd_catalog)?;
+    let id_gd_whole = load_id_gd_whole(storage, &idgd_catalog)?;
     eprintln!("  id_gd whole-card bitmaps: {}", id_gd_whole.len());
 
-    let id_gd_per_line = load_id_gd_per_line(&index_dir, &idgd_catalog)?;
+    let id_gd_per_line = load_id_gd_per_line(storage, &idgd_catalog)?;
     eprintln!("  id_gd per-line bitmaps: {}", id_gd_per_line.len());
 
-    let stats = load_stats(&index_dir, &stats_summary)?;
+    let stats = load_stats(storage, &stats_summary)?;
     eprintln!("  stats field groups: {}", stats.len());
 
-    let factions = load_factions(&index_dir, &factions_summary)?;
+    let factions = load_factions(storage, &factions_summary)?;
     eprintln!("  faction bitmaps: {}", factions.len());
 
     let set_bitmaps = build_set_bitmaps(&catalog);
@@ -369,36 +430,33 @@ pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
     })
 }
 
+/// Eagerly load the full merged index directory into memory.
+pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
+    load_uniques_index_from(&DiskIndexStorage::new(index_dir)?)
+}
+
 /// Load index and wrap in [`AppState`] for Axum.
-pub fn load_index(index_dir: &Path) -> Result<AppState> {
-    Ok(AppState::new(load_uniques_index(index_dir)?))
+pub fn load_index(index_path: &Path) -> Result<AppState> {
+    Ok(AppState::new(load_uniques_index_from(
+        &open_index_storage(index_path)?,
+    )?))
 }
 
-fn load_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
-    let text = fs::read_to_string(path)
-        .with_context(|| format!("read {}", path.display()))?;
-    serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))
-}
-
-fn load_roar(path: &Path) -> Result<RoaringBitmap> {
-    let bytes = fs::read(path).with_context(|| format!("read {}", path.display()))?;
-    RoaringBitmap::deserialize_from(&bytes[..])
-        .with_context(|| format!("deserialize roaring bitmap {}", path.display()))
-}
-
-fn load_id_gd_whole(index_dir: &Path, catalog: &IdGdCatalog) -> Result<BTreeMap<u32, RoaringBitmap>> {
-    let id_gd_dir = index_dir.join("id_gd");
+fn load_id_gd_whole(
+    storage: &impl IndexStorage,
+    catalog: &IdGdCatalog,
+) -> Result<BTreeMap<u32, RoaringBitmap>> {
     let mut map = BTreeMap::new();
 
     for entry in &catalog.entries {
         if entry.bitmap_bytes == 0 {
             continue;
         }
-        let path = id_gd_dir.join(&entry.bitmap_file);
-        if !path.is_file() {
+        let relative_path = format!("id_gd/{}", entry.bitmap_file);
+        if !storage.has_file(&relative_path) {
             continue;
         }
-        let bmp = BitmapStore::load(entry.id_gd, &path)?;
+        let bmp = read_roar_id_gd(storage, entry.id_gd, &relative_path)?;
         if !bmp.is_empty() {
             map.insert(entry.id_gd, bmp);
         }
@@ -407,8 +465,10 @@ fn load_id_gd_whole(index_dir: &Path, catalog: &IdGdCatalog) -> Result<BTreeMap<
     Ok(map)
 }
 
-fn load_id_gd_per_line(index_dir: &Path, catalog: &IdGdCatalog) -> Result<BTreeMap<(u32, EffectLine), RoaringBitmap>> {
-    let id_gd_dir = index_dir.join("id_gd");
+fn load_id_gd_per_line(
+    storage: &impl IndexStorage,
+    catalog: &IdGdCatalog,
+) -> Result<BTreeMap<(u32, EffectLine), RoaringBitmap>> {
     let mut map = BTreeMap::new();
 
     for entry in &catalog.entries {
@@ -423,11 +483,11 @@ fn load_id_gd_per_line(index_dir: &Path, catalog: &IdGdCatalog) -> Result<BTreeM
             if meta.bitmap_bytes == 0 {
                 continue;
             }
-            let path = id_gd_dir.join(&meta.bitmap_file);
-            if !path.is_file() {
+            let relative_path = format!("id_gd/{}", meta.bitmap_file);
+            if !storage.has_file(&relative_path) {
                 continue;
             }
-            let bmp = BitmapStore::load(entry.id_gd, &path)?;
+            let bmp = read_roar_id_gd(storage, entry.id_gd, &relative_path)?;
             if !bmp.is_empty() {
                 map.insert((entry.id_gd, line), bmp);
             }
@@ -441,7 +501,10 @@ fn stat_field_from_dir_name(name: &str) -> Option<StatField> {
     StatField::ALL.into_iter().find(|f| f.dir_name() == name)
 }
 
-fn load_stats(index_dir: &Path, summary: &StatsSummary) -> Result<BTreeMap<StatField, [RoaringBitmap; 16]>> {
+fn load_stats(
+    storage: &impl IndexStorage,
+    summary: &StatsSummary,
+) -> Result<BTreeMap<StatField, [RoaringBitmap; 16]>> {
     let mut out = BTreeMap::new();
 
     for field_summary in &summary.fields {
@@ -451,21 +514,19 @@ fn load_stats(index_dir: &Path, summary: &StatsSummary) -> Result<BTreeMap<StatF
         };
 
         let mut buckets: [RoaringBitmap; 16] = std::array::from_fn(|_| RoaringBitmap::new());
-        let field_dir = index_dir.join(&field_summary.bitmap_dir);
 
         for (&value, &count) in &field_summary.counts {
             if count == 0 {
                 continue;
             }
-            let path = field_dir.join(format!("{value:02}.roar"));
-            if !path.is_file() {
+            let relative_path = format!("{}/{}", field_summary.bitmap_dir, format!("{value:02}.roar"));
+            if !storage.has_file(&relative_path) {
                 eprintln!(
-                    "  warning: missing stat bitmap {} (count={count})",
-                    path.display()
+                    "  warning: missing stat bitmap {relative_path} (count={count})"
                 );
                 continue;
             }
-            let bmp = load_roar(&path)?;
+            let bmp = read_roar(storage, &relative_path)?;
             buckets[value as usize] = bmp;
         }
 
@@ -481,7 +542,10 @@ fn faction_from_reference(reference: &str) -> Option<Faction> {
         .find(|f| f.reference() == reference)
 }
 
-fn load_factions(index_dir: &Path, summary: &FactionsSummary) -> Result<BTreeMap<Faction, RoaringBitmap>> {
+fn load_factions(
+    storage: &impl IndexStorage,
+    summary: &FactionsSummary,
+) -> Result<BTreeMap<Faction, RoaringBitmap>> {
     let mut out = BTreeMap::new();
 
     for entry in &summary.factions {
@@ -492,16 +556,14 @@ fn load_factions(index_dir: &Path, summary: &FactionsSummary) -> Result<BTreeMap
             eprintln!("  warning: unknown faction {}", entry.reference);
             continue;
         };
-        let path = index_dir.join(&entry.bitmap_file);
-        if !path.is_file() {
+        if !storage.has_file(&entry.bitmap_file) {
             eprintln!(
                 "  warning: missing faction bitmap {} (card_count={})",
-                path.display(),
-                entry.card_count
+                entry.bitmap_file, entry.card_count
             );
             continue;
         }
-        let bmp = load_roar(&path)?;
+        let bmp = read_roar(storage, &entry.bitmap_file)?;
         if !bmp.is_empty() {
             out.insert(faction, bmp);
         }
