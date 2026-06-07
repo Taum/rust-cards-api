@@ -89,6 +89,11 @@ create-index-all root_dir="../equinox-cards":
 index-merge sets="COREKS,CORE,ALIZE,BISE,CYCLONE,DUSTER,EOLE":
     cargo run -p cli-indexer --release -- merge --index-dir build/sets_index --sets {{sets}} --out build/full_index/ALL_SETS
 
+# Compress the full index into a single .tar.zst file.
+[group('4-production'), unix]
+compress-index:
+    tar -I zstd -C build/full_index/ALL_SETS -cvf build/full_index.tar.zst .
+
 # Build the Cloud Run Docker image (requires build/full_index/ALL_SETS on disk).
 [group('4-production')]
 docker:
