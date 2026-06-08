@@ -133,3 +133,45 @@ docker-push version:
     docker build -t $($env:DOCKER_REGISTRY):v{{version}} -f Dockerfile .
     docker push $($env:DOCKER_REGISTRY):v{{version}}
 
+# Passthrough to image-sampler (release). Example: just img analyze --help
+[group('9-img-sampler')]
+img *ARGS:
+    cargo run -p image-sampler --release -- {{ARGS}}
+
+# Count ability combinations from cards.bin (no JSON crawl).
+[group('9-img-sampler')]
+img-analyze index_dir="build/full_index" set="ALL_SETS" out_json="out/analyze.json":
+    cargo run -p image-sampler --release -- analyze --index-dir {{index_dir}} --set {{set}} --out-json {{out_json}}
+
+# Sample ~200K English cards into out/plan.jsonl (shape floor + locale tiers).
+[group('9-img-sampler')]
+img-sample equinox_root="../equinox-cards" budget="200000" seed="7519" plan="out/plan.jsonl" summary="out/plan-summary.json":
+    cargo run -p image-sampler --release -- sample --index-dir build/full_index --set ALL_SETS --equinox-root {{equinox_root}} --budget {{budget}} --full-locale-fraction 0.01 --fr-locale-fraction 0.10 --seed {{seed}} --out {{plan}} --out-summary {{summary}}
+
+# Smaller sample for testing (5K cards).
+[group('9-img-sampler')]
+img-sample-test equinox_root="../equinox-cards" budget="2000" plan="out/plan-test.jsonl" summary="out/plan-test-summary.json":
+    cargo run -p image-sampler --release -- sample --equinox-root {{equinox_root}} --budget {{budget}} --out {{plan}} --out-summary {{summary}}
+
+# Resolve sampled cards' JSONs → out/plan-resolved.jsonl (locale → rel_path only).
+[group('9-img-sampler')]
+img-resolve equinox_root="../equinox-cards" plan="out/plan.jsonl" resolved="out/plan-resolved.jsonl" errors="out/resolve-errors.jsonl":
+    cargo run -p image-sampler --release -- resolve-urls --plan {{plan}} --equinox-root {{equinox_root}} --out {{resolved}} --out-errors {{errors}}
+
+# Download images from plan-resolved (resumable; skips existing files on disk).
+[group('9-img-sampler')]
+img-download-spot-check quality="75" plan="out/plan-resolved.jsonl" out_dir="out" concurrency="4" spot_check="5" seed="7519" rate="2":
+    cargo run -p image-sampler --release -- download --plan {{plan}} --out-dir {{out_dir}}/compare-q{{quality}} --concurrency {{concurrency}} --spot-check-n {{spot_check}} --seed {{seed}} --images-per-second {{rate}} --quality {{quality}}
+
+# Resume download after interrupt (no spot-check).
+[group('9-img-sampler')]
+img-download plan="out/plan-resolved.jsonl" out_dir="out" concurrency="5" seed="7519" rate="10":
+    cargo run -p image-sampler --release -- download --plan {{plan}} --out-dir {{out_dir}} --concurrency {{concurrency}} --spot-check-n 0 --seed {{seed}} --images-per-second {{rate}}
+
+# Full pipeline: sample → resolve → download (uses default 200K budget).
+[group('9-img-sampler')]
+img-pipeline equinox_root="../equinox-cards":
+    just img-sample equinox_root={{equinox_root}}
+    just img-resolve equinox_root={{equinox_root}}
+    just img-download
+
