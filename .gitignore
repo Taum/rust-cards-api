@@ -8,8 +8,12 @@ target
 **/mutants.out*/
 
 build
+deployment
 
 cli-indexer/tmp-scripts
 
+.env
+.env.local
 uniques-http-api/.env
 uniques-http-api/.env.local
+uniques-http-api/config/local.toml

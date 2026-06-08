@@ -1,12 +1,5 @@
 ## Multi-stage build for Cloud Run.
 ##
-## Build context must include:
-## - Cargo.toml, Cargo.lock (workspace root)
-## - index-core/
-## - cli-indexer/
-## - uniques-http-api/
-## - build/full_index/ALL_SETS (embedded into the image)
-##
 ## Example:
 ##   docker build -t uniques-http-api .
 
@@ -22,7 +15,6 @@ COPY uniques-http-api/ ./uniques-http-api/
 
 RUN cargo build --release -p uniques-http-api
 
-
 FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update \
@@ -31,15 +23,17 @@ RUN apt-get update \
 
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin app
 
-ENV INDEX_PATH=/opt/index/ALL_SETS
+ENV APP_ENV=production
+ENV CONFIG_DIR=/app/config
 ENV PORT=8080
 
 WORKDIR /app
 
 COPY --from=builder /app/target/release/uniques-http-api /app/uniques-http-api
-COPY build/full_index/ALL_SETS /opt/index/ALL_SETS
+COPY uniques-http-api/config/default.toml /app/config/default.toml
+COPY deployment/production.toml /app/config/production.toml
 
-RUN chown -R app:app /app /opt/index
+RUN chown -R app:app /app
 
 USER app
 

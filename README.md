@@ -43,7 +43,16 @@ cargo install just
 
 On Windows you can also use `winget install Casey.Just`.
 
-3. Run from the repository root
+3. Copy example local.env / local.toml files
+
+Local environment and config files are ignored on Git, they allow developers to run configs to match their local dev environment.
+
+```bash
+cp uniques-http-api/config/local.toml.example uniques-http-api/config/local.toml
+cp .env.local.template .env.local
+```
+
+4. Run from the repository root
 
 Common tasks via `just`:
 
@@ -53,7 +62,7 @@ just api          # build and run the HTTP API (release)
 just demo-ui      # run the Vite demo UI dev server
 ```
 
-The API reads `uniques-http-api/.env.local` (copy from [`.env.local.template`](uniques-http-api/.env.local.template)). You need a merged index at `build/full_index/ALL_SETS` before the API can start — see [CLI Reference](./docs/cli-reference.md) and `just` recipes under `4-production`.
+The API reads `uniques-http-api/config/local.toml` (copy from [`.local.toml.template`](uniques-http-api/config/local.toml.example)). You need a merged index at `build/` before the API can start — see **Pre-build index** section below and `just` recipes under `4-production`.
 
 Equivalent Cargo commands:
 
@@ -70,10 +79,16 @@ cargo build --release
 .\target\release\uniques-http-api.exe
 ```
 
-See [CLI Reference](./docs/cli-reference.md) for command-line examples.
+See [CLI Reference](./docs/cli-reference.md) for `cli-indexer` command-line examples.
+
+## Pre-built index
+
+A pre-built index is available from https://storage.googleapis.com/taum-reunion-public/index/full_index.tar.zst
+
+Save it into a `build` folder at the root of this repository (folder is Gitignored). The default local configuration of the API server will read from it.
 
 ## Deployment
 
-A [Dockerfile](./Dockerfile) builds the HTTP server image with embedded index.
+A [Dockerfile](./Dockerfile) builds the HTTP server image.
 
-The expected process is to build the index first (per-set output in `build/sets_index/`, merged output in `build/full_index/ALL_SETS`) from the AlteredEquinox repositories, then the Docker image will embed a copy of it.
+The Dockerfile expects a production configuration in ./deployment/production.toml -- you can create an empty file if you do not need to do any overrides to the default configuration.

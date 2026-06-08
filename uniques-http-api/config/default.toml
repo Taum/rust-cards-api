@@ -1,0 +1,9 @@
+[server]
+port = 8080
+
+[index]
+source = "disk"
+path = "./build/full_index.tar.zst"
+
+[index.reload]
+enabled = false

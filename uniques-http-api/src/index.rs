@@ -3,8 +3,10 @@ mod query;
 mod reload;
 pub mod uniques_index;
 
-pub use loader::load_index;
-pub use reload::{spawn_hot_reload, DiskIndexSource};
+pub use loader::{
+    load_index, load_index_from_object_store, ObjectStoreIndexClient,
+};
+pub use reload::{spawn_hot_reload, AnyIndexSource, DiskIndexSource, RemoteIndexSource};
 pub use query::QueryError;
 pub use uniques_index::{CardResolveError, UniquesIndex};
 pub(crate) use query::{

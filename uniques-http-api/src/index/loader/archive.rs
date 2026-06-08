@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -9,26 +9,34 @@ use tar::Archive;
 use super::storage::IndexStorage;
 
 pub struct TarZstIndexStorage {
-    archive_path: PathBuf,
+    source_label: PathBuf,
     entries: HashMap<String, Vec<u8>>,
 }
 
 impl TarZstIndexStorage {
     pub fn open(path: &Path) -> Result<Self> {
-        let archive_path = path.to_path_buf();
-        let file = File::open(&archive_path)
-            .with_context(|| format!("open archive {}", archive_path.display()))?;
-        let decoder = zstd::Decoder::new(file)
-            .with_context(|| format!("open zstd decoder for {}", archive_path.display()))?;
+        let source_label = path.to_path_buf();
+        let file = File::open(&source_label)
+            .with_context(|| format!("open archive {}", source_label.display()))?;
+        Self::open_from_reader(file, source_label)
+    }
+
+    pub fn from_bytes(bytes: &[u8], source_label: impl Into<PathBuf>) -> Result<Self> {
+        Self::open_from_reader(Cursor::new(bytes), source_label.into())
+    }
+
+    fn open_from_reader(reader: impl Read, source_label: PathBuf) -> Result<Self> {
+        let decoder = zstd::Decoder::new(reader)
+            .with_context(|| format!("open zstd decoder for {}", source_label.display()))?;
         let mut archive = Archive::new(decoder);
 
         let mut entries = HashMap::new();
         for entry in archive
             .entries()
-            .with_context(|| format!("read tar entries from {}", archive_path.display()))?
+            .with_context(|| format!("read tar entries from {}", source_label.display()))?
         {
             let mut entry = entry.with_context(|| {
-                format!("read tar entry from {}", archive_path.display())
+                format!("read tar entry from {}", source_label.display())
             })?;
             if entry.header().entry_type().is_dir() {
                 continue;
@@ -37,14 +45,17 @@ impl TarZstIndexStorage {
                 continue;
             };
             let mut bytes = Vec::new();
-            entry
-                .read_to_end(&mut bytes)
-                .with_context(|| format!("read {relative_path} from {}", archive_path.display()))?;
+            entry.read_to_end(&mut bytes).with_context(|| {
+                format!(
+                    "read {relative_path} from {}",
+                    source_label.display()
+                )
+            })?;
             entries.insert(relative_path, bytes);
         }
 
         Ok(Self {
-            archive_path,
+            source_label,
             entries,
         })
     }
@@ -52,7 +63,7 @@ impl TarZstIndexStorage {
 
 impl IndexStorage for TarZstIndexStorage {
     fn source_path(&self) -> &Path {
-        &self.archive_path
+        &self.source_label
     }
 
     fn read_bytes(&self, relative_path: &str) -> Result<Vec<u8>> {
@@ -62,7 +73,7 @@ impl IndexStorage for TarZstIndexStorage {
             .with_context(|| {
                 format!(
                     "missing {relative_path} in archive {}",
-                    self.archive_path.display()
+                    self.source_label.display()
                 )
             })
     }

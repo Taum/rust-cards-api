@@ -4,6 +4,9 @@
 # Recipe help:    just --list
 #
 
+set dotenv-load := true
+set dotenv-path := ".env.local"
+
 # Just uses `sh` by default, but on windows we want to use PowerShell as it is more common and easier to use.
 # We will need to write custom recipes for Windows if going beyond simple passthrough commands.
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
@@ -94,8 +97,39 @@ index-merge sets="COREKS,CORE,ALIZE,BISE,CYCLONE,DUSTER,EOLE":
 compress-index:
     tar -C build/full_index/ALL_SETS -I "zstd -19" --transform 's,^\./,,' -cvf build/full_index.tar.zst .
 
+# Publish merged index to GCS (requires gcloud ADC + GCS_INDEX_BUCKET in .env.local).
+[group('4-production'), unix]
+publish-index prefix="index":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${GCS_INDEX_BUCKET:?Set GCS_INDEX_BUCKET in .env.local}"
+    if [[ ! -f build/full_index.tar.zst ]]; then
+      echo "build/full_index.tar.zst not found; run: just compress-index" >&2
+      exit 1
+    fi
+    archive_object="{{prefix}}/full_index.tar.zst"
+    gsutil cp build/full_index.tar.zst "gs://${GCS_INDEX_BUCKET}/${archive_object}"
+    version="$(python -c "import json; m=json.load(open('build/full_index/ALL_SETS/manifest.json')); print(json.dumps({'version': m['built_at_secs'], 'archive_object': '${archive_object}'}))")"
+    printf '%s\n' "$version" > build/version.json
+    gsutil cp build/version.json "gs://${GCS_INDEX_BUCKET}/{{prefix}}/version.json"
+
+# Publish merged index to GCS (requires gcloud ADC + GCS_INDEX_BUCKET in .env.local).
+[group('4-production'), windows]
+publish-index prefix="index":
+    if (-not $env:GCS_INDEX_BUCKET) { throw "Set GCS_INDEX_BUCKET in .env.local" }
+    if (-not (Test-Path build/full_index.tar.zst)) { throw "build/full_index.tar.zst not found; run: just compress-index" }
+    gsutil cp build/full_index.tar.zst "gs://$($env:GCS_INDEX_BUCKET)/{{prefix}}/full_index.tar.zst"
+    python -c "import json; ao='{{prefix}}/full_index.tar.zst'; m=json.load(open('build/full_index/ALL_SETS/manifest.json')); json.dump({'version': m['built_at_secs'], 'archive_object': ao}, open('build/version.json','w'))"
+    gsutil cp build/version.json "gs://$($env:GCS_INDEX_BUCKET)/{{prefix}}/version.json"
+
 # Build the Cloud Run Docker image (requires build/full_index/ALL_SETS on disk).
 [group('4-production')]
 docker:
     docker build -t uniques-http-api .
-    
+
+# Build and push the Cloud Run image to Artifact Registry. Example: just docker-push 0.0.8
+[group('4-production'), windows]
+docker-push version:
+    docker build -t $($env:DOCKER_REGISTRY):v{{version}} -f Dockerfile .
+    docker push $($env:DOCKER_REGISTRY):v{{version}}
+

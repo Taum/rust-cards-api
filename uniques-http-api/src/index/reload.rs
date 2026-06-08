@@ -1,4 +1,5 @@
 mod disk;
+mod remote;
 mod source;
 mod tick;
 
@@ -9,16 +10,36 @@ use crate::http::state::AppState;
 use tokio::time::MissedTickBehavior;
 
 pub use disk::DiskIndexSource;
+pub use remote::RemoteIndexSource;
 pub use source::IndexSource;
 
-const DEFAULT_RELOAD_INTERVAL_SECS: u64 = 60;
+#[derive(Clone)]
+pub enum AnyIndexSource {
+    Disk(DiskIndexSource),
+    Remote(RemoteIndexSource),
+}
 
-pub fn spawn_hot_reload(state: Arc<AppState>, source: impl IndexSource + 'static) {
-    let interval_secs = std::env::var("INDEX_RELOAD_INTERVAL_SECS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_RELOAD_INTERVAL_SECS);
+impl IndexSource for AnyIndexSource {
+    fn read_version(&self) -> anyhow::Result<u64> {
+        match self {
+            Self::Disk(source) => source.read_version(),
+            Self::Remote(source) => source.read_version(),
+        }
+    }
 
+    fn load_index(&self) -> anyhow::Result<crate::index::UniquesIndex> {
+        match self {
+            Self::Disk(source) => source.load_index(),
+            Self::Remote(source) => source.load_index(),
+        }
+    }
+}
+
+pub fn spawn_hot_reload(
+    state: Arc<AppState>,
+    source: impl IndexSource + 'static,
+    interval_secs: u64,
+) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(interval_secs));
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);

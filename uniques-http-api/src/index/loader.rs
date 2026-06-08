@@ -20,12 +20,14 @@ use crate::index::UniquesIndex;
 
 pub mod archive;
 pub mod disk;
+pub mod object_store;
 pub mod storage;
 
+pub use archive::TarZstIndexStorage;
 pub use disk::DiskIndexStorage;
+pub use object_store::{load_index_from_object_store, ObjectStoreIndexClient};
 pub use storage::IndexStorage;
 
-use archive::TarZstIndexStorage;
 use storage::{read_json, read_roar, read_roar_id_gd};
 
 #[derive(Debug, Clone, Deserialize)]

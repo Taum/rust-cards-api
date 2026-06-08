@@ -21,7 +21,7 @@ impl DiskIndexSource {
 }
 
 impl IndexSource for DiskIndexSource {
-    fn read_built_at_secs(&self) -> Result<u64> {
+    fn read_version(&self) -> Result<u64> {
         Ok(read_manifest(&self.index_dir)?.built_at_secs)
     }
 
