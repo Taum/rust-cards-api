@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
-use axum::extract::{Path, RawQuery};
+use axum::extract::{Path, RawQuery, State};
 use axum::Json;
 
 use index_core::idgd_catalog::IdGdCatalogEntry;
 
 use crate::http::api::cards::parse::{parse_query_multimap, parse_request};
 use crate::http::api::error::{bad_request, map_query_error, not_found, ApiResult};
-use crate::http::IndexSnapshot;
+use crate::http::{IndexSnapshot, ServerState};
 use crate::index::{build_bitmap, card_v2_from_index, cards_from_indices, families_from_bitmap, page_cards_v2, CardResolveError};
 use super::{CardV2, CardsIter, CardsResponse};
 
@@ -46,12 +46,20 @@ pub async fn get_card_v2(
 }
 
 pub async fn get_cards_v2(
-    IndexSnapshot(index): IndexSnapshot,
+    State(server): State<ServerState>,
     RawQuery(query): RawQuery,
 ) -> ApiResult<Json<CardsResponse>> {
     let params = parse_query_multimap(query.as_deref())?;
-    let req = parse_request(&index, &params)?;
-    let bitmap = build_bitmap(&index, &req).map_err(map_query_error)?;
+    let snapshot = server.app.snapshot();
+    let index = snapshot.index.as_ref();
+    let formats = snapshot.formats.as_ref();
+    let formats_enabled = server
+        .settings
+        .formats
+        .as_ref()
+        .is_some_and(|f| f.is_enabled());
+    let req = parse_request(index, formats, formats_enabled, &params)?;
+    let bitmap = build_bitmap(index, formats, &req).map_err(map_query_error)?;
     let total = bitmap.len() as u64;
 
     let (cards, next_cursor, families) = if req.with_families && req.cursor.is_none() {

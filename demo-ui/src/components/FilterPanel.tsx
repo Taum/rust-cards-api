@@ -203,6 +203,24 @@ export function FilterPanel({
       </section>
 
       <section className="space-y-2">
+        <label className="block text-sm text-slate-300">
+          Format
+          <input
+            type="text"
+            value={filters.format}
+            onChange={(e) => setFilters({ format: e.target.value })}
+            placeholder="sample-50"
+            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
+          />
+        </label>
+        <p className="text-xs text-slate-500">
+          Sent as{' '}
+          <code className="font-mono text-slate-400">format=…</code> on card
+          searches (requires formats enabled on the API).
+        </p>
+      </section>
+
+      <section className="space-y-2">
         <h3 className="text-sm font-medium text-slate-300">Factions</h3>
         <div className="flex flex-wrap gap-3">
           {FACTIONS.map((code) => (

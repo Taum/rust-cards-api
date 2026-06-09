@@ -1,13 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use roaring::RoaringBitmap;
 use tower::ServiceExt;
-use uniques_http_api::{app, load_index, AppState};
+use uniques_http_api::{app, load_index, ServerState};
 
 // Builds a small on-disk index in a temp dir with per-line bitmaps so the
 // /api/v2/effects/filtered semantics can be exercised end-to-end.
@@ -128,17 +127,17 @@ fn build_fixture() -> PathBuf {
     dir
 }
 
-fn test_state() -> Arc<AppState> {
-    Arc::new(load_index(&build_fixture()).expect("load fixture index"))
+fn test_server() -> ServerState {
+    ServerState::for_test(load_index(&build_fixture()).expect("load fixture index"))
 }
 
-async fn call(state: Arc<AppState>, query: &str) -> (StatusCode, serde_json::Value) {
+async fn call(server: ServerState, query: &str) -> (StatusCode, serde_json::Value) {
     let uri = if query.is_empty() {
         "/api/v2/effects/filtered".to_string()
     } else {
         format!("/api/v2/effects/filtered?{query}")
     };
-    let response = app(state)
+    let response = app(server)
         .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
         .await
         .unwrap();
@@ -162,7 +161,7 @@ const T1: &str = "effect%5B0%5D%5Bt%5D=1";
 
 #[tokio::test]
 async fn lists_outputs_co_occurring_with_trigger_on_a_main_line() {
-    let (status, body) = call(test_state(), &format!("{T1}&editing=output:0")).await;
+    let (status, body) = call(test_server(), &format!("{T1}&editing=output:0")).await;
     assert_eq!(status, 200);
     assert_eq!(body["editing"], "output:0");
     // O3 (with T1 on card 0's M1) and O4 (with T1 on card 1's M1).
@@ -174,7 +173,7 @@ async fn same_line_constraint_excludes_cross_line_combinations() {
     // T1 is on M1 (cards 0,1,3); C5 is on M2 (card 1). No single main line has both,
     // so no output can complete an ability -> empty.
     let (status, body) = call(
-        test_state(),
+        test_server(),
         &format!("{T1}&effect%5B0%5D%5Bc%5D=5&editing=output:0"),
     )
     .await;
@@ -185,7 +184,7 @@ async fn same_line_constraint_excludes_cross_line_combinations() {
 #[tokio::test]
 async fn support_region_uses_echo_line_only() {
     // support[t]=1 -> echo line Ec. Card 2's Ec has T1 and O3, but not O4 (main only).
-    let (status, body) = call(test_state(), "support%5Bt%5D=1&editing=output:support").await;
+    let (status, body) = call(test_server(), "support%5Bt%5D=1&editing=output:support").await;
     assert_eq!(status, 200);
     assert_eq!(body["editing"], "output:support");
     assert_eq!(ids(&body), vec![3]);
@@ -195,7 +194,7 @@ async fn support_region_uses_echo_line_only() {
 async fn edited_group_is_excluded_from_base() {
     // Editing the trigger box whose own value is 7 must not filter out other triggers:
     // with no co-constraints, all main-line triggers are offered.
-    let (status, body) = call(test_state(), "effect%5B0%5D%5Bt%5D=7&editing=trigger:0").await;
+    let (status, body) = call(test_server(), "effect%5B0%5D%5Bt%5D=7&editing=trigger:0").await;
     assert_eq!(status, 200);
     assert_eq!(ids(&body), vec![1, 7]);
 }
@@ -204,32 +203,32 @@ async fn edited_group_is_excluded_from_base() {
 async fn brand_new_slot_narrows_by_remaining_filters() {
     // editing=trigger:3 references a slot not present; effect[0] (T1) stays in Base, so only
     // triggers reachable among cards already matching T1 (cards 0,1,3) are offered -> just T1.
-    let (status, body) = call(test_state(), &format!("{T1}&editing=trigger:3")).await;
+    let (status, body) = call(test_server(), &format!("{T1}&editing=trigger:3")).await;
     assert_eq!(status, 200);
     assert_eq!(ids(&body), vec![1]);
 }
 
 #[tokio::test]
 async fn missing_editing_param_is_bad_request() {
-    let (status, _) = call(test_state(), "").await;
+    let (status, _) = call(test_server(), "").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn invalid_editing_part_is_bad_request() {
-    let (status, _) = call(test_state(), "editing=banana:0").await;
+    let (status, _) = call(test_server(), "editing=banana:0").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn invalid_editing_slot_is_bad_request() {
-    let (status, _) = call(test_state(), "editing=trigger:nope").await;
+    let (status, _) = call(test_server(), "editing=trigger:nope").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
 async fn wrong_type_co_constraint_is_bad_request() {
     // effect[0][t]=3 -> id 3 is an OUTPUT, not a TRIGGER.
-    let (status, _) = call(test_state(), "effect%5B0%5D%5Bt%5D=3&editing=output:0").await;
+    let (status, _) = call(test_server(), "effect%5B0%5D%5Bt%5D=3&editing=output:0").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }

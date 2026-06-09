@@ -10,7 +10,71 @@
 | Yes       | `set[]`     | repeated array  | `set[]=CORE`   | Filter by one or more source set codes (e.g. `CORE`, `COREKS`). Alias: `set=CORE,COREKS` (CSV). OR within listed sets; AND with other filters.                                                                                           |
 | Yes       | `faction[]` | repeated array  | `faction[]=AX` | Filter by one or more faction codes.                                                                                                                                                                                                     |
 | Yes       | `name`      | string          | `name=Kelon`   | Case-insensitive substring match on character name (any locale). Accented characters match unaccented queries (e.g. `elementaire` matches `Élémentaire`, `boshi` matches `Issun-bōshi`). Whitespace-only values are ignored (no filter). |
+| Yes       | `format`    | string          | `format=standard` | Restrict results to a configured format (see [Format filters](#format-filters)). Only one format per request. If the parameter appears more than once, the **last** value wins. Requires `[formats]` in server config; otherwise any `format=` value returns `400 unknown format '{id}'`. |
 
+
+### Format filters
+
+When the server is configured with a `[formats]` section, format definitions are loaded from a
+manifest-driven directory on disk. Each format is a JSON file listed in `manifest.json`:
+
+```json
+[
+  { "id": "standard", "path": "standard.json", "version": 1 },
+  { "id": "draft", "path": "draft.json", "version": 2 }
+]
+```
+
+Each format JSON must match its manifest entry on `id` and `version`. A format uses **either**
+include mode **or** exclude mode (not both):
+
+| Mode | Fields | Query effect |
+| ---- | ------ | ------------ |
+| Include | `included_refs` (card reference strings) | AND with other filters |
+| Exclude | `excluded_sets` (set codes), `excluded_refs` (card references) | AND NOT with other filters |
+
+Example include format:
+
+```json
+{
+  "id": "standard",
+  "version": 1,
+  "included_refs": ["ALT_CORE_B_AX_01_U_1", "ALT_CORE_B_BR_02_U_3"]
+}
+```
+
+Example exclude format:
+
+```json
+{
+  "id": "no-coreks",
+  "version": 1,
+  "excluded_sets": ["COREKS"],
+  "excluded_refs": []
+}
+```
+
+**Errors**
+
+| Status | Condition |
+| ------ | --------- |
+| `400` | Unknown format id, or `[formats]` not configured |
+| `500` | Known format id but that format failed to load at startup/reload (`format failed to load`) |
+
+Formats apply to `GET /api/v2/cards` and `GET /api/v2/effects/filtered` (same filter pipeline).
+
+**Server config** (`config/default.toml` or env):
+
+```toml
+[formats]
+# reload_interval_secs = 60  # omit or 0 = no hot-reload
+
+[formats.source]
+type = "disk"
+path = "./formats"
+```
+
+`FORMATS_PATH` env overrides `formats.source.path`.
 
 ### Numeric and stat filters
 

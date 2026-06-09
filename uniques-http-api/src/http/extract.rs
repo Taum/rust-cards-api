@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 
-use crate::http::state::AppState;
+use crate::http::ServerState;
 use crate::index::UniquesIndex;
 
 /// Per-request snapshot of the current index (one `Arc` clone, held for the handler lifetime).
@@ -19,13 +19,13 @@ impl Deref for IndexSnapshot {
     }
 }
 
-impl FromRequestParts<Arc<AppState>> for IndexSnapshot {
+impl FromRequestParts<ServerState> for IndexSnapshot {
     type Rejection = Infallible;
 
     async fn from_request_parts(
         _parts: &mut Parts,
-        state: &Arc<AppState>,
+        state: &ServerState,
     ) -> Result<Self, Self::Rejection> {
-        Ok(IndexSnapshot(state.index()))
+        Ok(IndexSnapshot(Arc::clone(&state.app.snapshot().index)))
     }
 }

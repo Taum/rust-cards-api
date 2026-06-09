@@ -1,22 +1,21 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use axum::body::Body;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uniques_http_api::{app, load_index};
+use uniques_http_api::{app, load_index, ServerState};
 
 const FIXTURE_INDEX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal_index");
 
-fn test_state() -> Arc<uniques_http_api::AppState> {
-    Arc::new(
+fn test_server() -> ServerState {
+    ServerState::for_test(
         load_index(Path::new(FIXTURE_INDEX)).expect("load minimal test index"),
     )
 }
 
 #[tokio::test]
 async fn cards_omit_bga_debug_trigram_by_default() {
-    let response = app(test_state())
+    let response = app(test_server())
         .oneshot(
             axum::http::Request::builder()
                 .uri("/api/v2/cards")
@@ -34,7 +33,7 @@ async fn cards_omit_bga_debug_trigram_by_default() {
 
 #[tokio::test]
 async fn cards_include_bga_debug_trigram_when_requested() {
-    let response = app(test_state())
+    let response = app(test_server())
         .oneshot(
             axum::http::Request::builder()
                 .uri("/api/v2/cards?debug_bga_trigram")

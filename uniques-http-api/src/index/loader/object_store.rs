@@ -169,14 +169,28 @@ impl ObjectStoreIndexClient {
 }
 
 pub fn load_index_from_object_store(client: &ObjectStoreIndexClient) -> Result<crate::http::state::AppState> {
+    Ok(crate::http::state::AppState::new_with_index(load_uniques_index_from_object_store(client)?))
+}
+
+pub fn load_uniques_index_from_object_store(client: &ObjectStoreIndexClient) -> Result<crate::index::UniquesIndex> {
     use super::load_uniques_index_from;
 
     let fetch = client.fetch_version_sync()?;
     let bytes = client.fetch_archive_bytes_sync(&fetch.sidecar)?;
     let storage = TarZstIndexStorage::from_bytes(&bytes, client.archive_source_label())?;
-    Ok(crate::http::state::AppState::new(load_uniques_index_from(
-        &storage,
-    )?))
+    load_uniques_index_from(&storage)
+}
+
+pub fn load_app_state_from_object_store(
+    client: &ObjectStoreIndexClient,
+    settings: &crate::config::Settings,
+) -> Result<crate::http::state::AppState> {
+    use super::build_app_state;
+
+    Ok(build_app_state(
+        load_uniques_index_from_object_store(client)?,
+        settings,
+    ))
 }
 
 fn verify_sha256(bytes: &[u8], expected: &str) -> Result<()> {

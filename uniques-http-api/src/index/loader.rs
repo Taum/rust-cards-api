@@ -14,8 +14,10 @@ use roaring::RoaringBitmap;
 use serde::Deserialize;
 use unicode_normalization::UnicodeNormalization;
 
+use crate::config::Settings;
+use crate::formats::{load_format_index, FormatIndex};
 use crate::http::api::effects::{build_effects_list, serialize_effects_list};
-use crate::http::state::AppState;
+use crate::http::state::{AppState, QuerySnapshot};
 use crate::index::UniquesIndex;
 
 pub mod archive;
@@ -25,7 +27,7 @@ pub mod storage;
 
 pub use archive::TarZstIndexStorage;
 pub use disk::DiskIndexStorage;
-pub use object_store::{load_index_from_object_store, ObjectStoreIndexClient};
+pub use object_store::{load_app_state_from_object_store, load_index_from_object_store, load_uniques_index_from_object_store, ObjectStoreIndexClient};
 pub use storage::IndexStorage;
 
 use storage::{read_json, read_roar, read_roar_id_gd};
@@ -437,11 +439,34 @@ pub fn load_uniques_index(index_dir: &Path) -> Result<UniquesIndex> {
     load_uniques_index_from(&DiskIndexStorage::new(index_dir)?)
 }
 
-/// Load index and wrap in [`AppState`] for Axum.
+/// Load index and format filters; wrap in [`AppState`].
+pub fn load_app_state(settings: &Settings) -> Result<AppState> {
+    let index = match settings.index.source {
+        crate::config::IndexSourceKind::Disk | crate::config::IndexSourceKind::Archive => {
+            load_uniques_index_from(&open_index_storage(&settings.index_path()?)?)?
+        }
+        crate::config::IndexSourceKind::ObjectStore => {
+            bail!("load_app_state for object_store: use load_index_from_object_store in main")
+        }
+    };
+    Ok(build_app_state(index, settings))
+}
+
+pub fn build_app_state(index: UniquesIndex, settings: &Settings) -> AppState {
+    let formats = match settings.formats.as_ref().filter(|f| f.is_enabled()) {
+        Some(formats_settings) => Arc::new(load_format_index(&index, formats_settings)),
+        None => Arc::new(FormatIndex::empty()),
+    };
+    AppState::new(QuerySnapshot {
+        index: Arc::new(index),
+        formats,
+    })
+}
+
+/// Load index only (empty format catalog) for tests.
 pub fn load_index(index_path: &Path) -> Result<AppState> {
-    Ok(AppState::new(load_uniques_index_from(
-        &open_index_storage(index_path)?,
-    )?))
+    let index = load_uniques_index_from(&open_index_storage(index_path)?)?;
+    Ok(AppState::new_with_index(index))
 }
 
 fn load_id_gd_whole(

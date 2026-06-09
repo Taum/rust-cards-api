@@ -7,6 +7,8 @@ use serde::Deserialize;
 pub struct Settings {
     pub server: ServerSettings,
     pub index: IndexSettings,
+    #[serde(default)]
+    pub formats: Option<FormatsSettings>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -64,6 +66,31 @@ fn validate_reload(reload: &ReloadSettings) -> Result<()> {
 pub struct ObjectStoreSettings {
     #[serde(default)]
     pub url: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FormatsSettings {
+    pub source: FormatsSourceConfig,
+    #[serde(default)]
+    pub reload_interval_secs: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FormatsSourceConfig {
+    Disk { path: String },
+}
+
+impl FormatsSettings {
+    pub fn is_enabled(&self) -> bool {
+        match &self.source {
+            FormatsSourceConfig::Disk { path } => !path.trim().is_empty(),
+        }
+    }
+
+    pub fn reload_interval_secs(&self) -> Option<u64> {
+        (self.reload_interval_secs > 0).then_some(self.reload_interval_secs)
+    }
 }
 
 impl Settings {
@@ -133,6 +160,20 @@ fn apply_legacy_env_overrides(settings: &mut Settings) {
             settings.index.reload.interval_secs = Some(secs);
         }
     }
+
+    if let Ok(path) = std::env::var("FORMATS_PATH") {
+        if !path.trim().is_empty() {
+            eprintln!("note: FORMATS_PATH env override; prefer formats.source.path in config");
+            settings.formats = Some(FormatsSettings {
+                source: FormatsSourceConfig::Disk { path },
+                reload_interval_secs: settings
+                    .formats
+                    .as_ref()
+                    .map(|f| f.reload_interval_secs)
+                    .unwrap_or(0),
+            });
+        }
+    }
 }
 
 fn validate_settings(settings: &Settings) -> Result<()> {
@@ -145,6 +186,11 @@ fn validate_settings(settings: &Settings) -> Result<()> {
         }
     }
     validate_reload(&settings.index.reload)?;
+    if let Some(formats) = &settings.formats {
+        if formats.reload_interval_secs > 0 && !formats.is_enabled() {
+            bail!("formats.reload_interval_secs requires formats.source.path to be set");
+        }
+    }
     Ok(())
 }
 

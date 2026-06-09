@@ -3,15 +3,13 @@ mod handlers;
 mod list;
 mod models;
 
-use std::sync::Arc;
-
 use axum::{routing::get, Router};
 
-use crate::http::state::AppState;
+use crate::http::ServerState;
 
 pub use list::{build_effects_list, serialize_effects_list};
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<ServerState> {
     Router::new()
         .route("/api/v2/effects", get(handlers::get_effects_v2))
         .route(

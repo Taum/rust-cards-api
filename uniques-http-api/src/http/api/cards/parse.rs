@@ -4,7 +4,8 @@ use url::form_urlencoded;
 
 use index_core::faction_index::Faction;
 
-use crate::http::api::error::{bad_request, ApiResult};
+use crate::formats::{FormatIndex, FormatLoadStatus};
+use crate::http::api::error::{bad_request, internal_server_error, ApiResult};
 use crate::index::UniquesIndex;
 use super::models::{
     AbilityFilters, CardsRequest, CompareOp, CostPredicate, EffectCombineMode,
@@ -36,7 +37,51 @@ fn has_any(params: &QueryMultiMap, key: &str) -> bool {
     params.get(key).is_some_and(|v| v.iter().any(|s| !s.trim().is_empty()))
 }
 
-pub(crate) fn parse_request(state: &UniquesIndex, params: &QueryMultiMap) -> ApiResult<CardsRequest> {
+pub(crate) fn parse_format(params: &QueryMultiMap) -> Option<String> {
+    let values = params.get("format")?;
+    let last = values
+        .iter()
+        .rev()
+        .find_map(|v| {
+            let trimmed = v.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })?;
+    Some(last)
+}
+
+fn resolve_format_filter(
+    format_id: Option<String>,
+    formats_enabled: bool,
+    format_index: &FormatIndex,
+) -> ApiResult<Option<String>> {
+    let Some(id) = format_id else {
+        return Ok(None);
+    };
+
+    if !formats_enabled {
+        return Err(bad_request(format!("unknown format '{id}'")));
+    }
+
+    let Some(loaded) = format_index.get(&id) else {
+        return Err(bad_request(format!("unknown format '{id}'")));
+    };
+
+    match &loaded.status {
+        FormatLoadStatus::Ready { .. } => Ok(Some(id)),
+        FormatLoadStatus::Failed => Err(internal_server_error("format failed to load")),
+    }
+}
+
+pub(crate) fn parse_request(
+    state: &UniquesIndex,
+    format_index: &FormatIndex,
+    formats_enabled: bool,
+    params: &QueryMultiMap,
+) -> ApiResult<CardsRequest> {
     let limit = match get_first(params, "limit") {
         None => 50usize,
         Some(v) => parse_usize("limit", v)?,
@@ -80,6 +125,8 @@ pub(crate) fn parse_request(state: &UniquesIndex, params: &QueryMultiMap) -> Api
 
     validate_idgd_types(state, &filters)?;
 
+    let format = resolve_format_filter(parse_format(params), formats_enabled, format_index)?;
+
     Ok(CardsRequest {
         limit,
         cursor,
@@ -91,6 +138,7 @@ pub(crate) fn parse_request(state: &UniquesIndex, params: &QueryMultiMap) -> Api
         name,
         debug_bga_trigram,
         with_families,
+        format,
     })
 }
 
@@ -463,19 +511,23 @@ fn parse_usize(field: &str, s: &str) -> ApiResult<usize> {
 }
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
+    use axum::http::StatusCode;
+    use index_core::faction_index::Faction;
+    use roaring::RoaringBitmap;
+
     use super::*;
+    use crate::formats::{FormatIndex, FormatLoadStatus, LoadedFormat};
+    use crate::http::api::cards::models::CostPredicate;
     use crate::http::api::cards::test_support::{test_state, test_state_with_sets};
     use crate::index::loader::{SET_CORE, SET_COREKS};
-    use crate::http::api::cards::models::CostPredicate;
-    use index_core::faction_index::Faction;
-    use axum::http::StatusCode;
-    use std::collections::HashMap;
     #[test]
     fn parse_with_families_flag() {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("withFamilies".to_string(), vec!["".to_string()]);
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert!(req.with_families);
     }
     #[test]
@@ -483,7 +535,7 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["191".to_string()]); // CONDITION but using [t]
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
     #[test]
@@ -493,7 +545,7 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("faction[]".to_string(), vec!["AX".to_string(), "BR".to_string()]);
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert_eq!(req.factions.len(), 2);
         assert!(req.factions.contains(&Faction::Ax));
         assert!(req.factions.contains(&Faction::Br));
@@ -501,7 +553,7 @@ mod tests {
         let mut params2: QueryMultiMap = HashMap::new();
         params2.insert("faction".to_string(), vec!["AX,BR".to_string()]);
         params2.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let req2 = parse_request(state.index().as_ref(), &params2).unwrap();
+        let req2 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params2).unwrap();
         assert_eq!(req2.factions.len(), 2);
         assert!(req2.factions.contains(&Faction::Ax));
         assert!(req2.factions.contains(&Faction::Br));
@@ -513,7 +565,7 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("faction[]".to_string(), vec!["NOPE".to_string()]);
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
     #[test]
@@ -522,14 +574,14 @@ mod tests {
 
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("set[]".to_string(), vec!["CORE".to_string(), "COREKS".to_string()]);
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert_eq!(req.sets.len(), 2);
         assert!(req.sets.contains(&SET_CORE.to_string()));
         assert!(req.sets.contains(&SET_COREKS.to_string()));
 
         let mut params2: QueryMultiMap = HashMap::new();
         params2.insert("set".to_string(), vec!["CORE,COREKS".to_string()]);
-        let req2 = parse_request(state.index().as_ref(), &params2).unwrap();
+        let req2 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params2).unwrap();
         assert_eq!(req2.sets.len(), 2);
     }
 
@@ -538,7 +590,7 @@ mod tests {
         let state = test_state_with_sets();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("set[]".to_string(), vec!["NOPE".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
     #[test]
@@ -549,21 +601,21 @@ mod tests {
         let mut p1: QueryMultiMap = HashMap::new();
         p1.insert("mainCost".to_string(), vec!["2".to_string()]);
         p1.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let r1 = parse_request(state.index().as_ref(), &p1).unwrap();
+        let r1 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &p1).unwrap();
         assert!(matches!(r1.main_cost, Some(CostPredicate::Exact(2))));
 
         // array (with csv)
         let mut p2: QueryMultiMap = HashMap::new();
         p2.insert("mainCost[]".to_string(), vec!["2,3".to_string()]);
         p2.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let r2 = parse_request(state.index().as_ref(), &p2).unwrap();
+        let r2 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &p2).unwrap();
         assert!(matches!(r2.main_cost, Some(CostPredicate::AnyOf(_))));
 
         // range
         let mut p3: QueryMultiMap = HashMap::new();
         p3.insert("recallCost[lte]".to_string(), vec!["3".to_string()]);
         p3.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let r3 = parse_request(state.index().as_ref(), &p3).unwrap();
+        let r3 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &p3).unwrap();
         assert!(matches!(r3.recall_cost, Some(CostPredicate::Range { .. })));
 
         // reject mixing
@@ -571,7 +623,7 @@ mod tests {
         p4.insert("mainCost[]".to_string(), vec!["2".to_string()]);
         p4.insert("mainCost[lte]".to_string(), vec!["3".to_string()]);
         p4.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let err = parse_request(state.index().as_ref(), &p4).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &p4).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
 
@@ -581,7 +633,7 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("mainCost".to_string(), vec!["99".to_string()]);
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
     #[test]
@@ -590,7 +642,7 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("effectMode".to_string(), vec!["xor".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
 
@@ -600,7 +652,7 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("effect[0][matchCount]".to_string(), vec!["4".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
 
@@ -609,7 +661,7 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert_eq!(req.filters.effects[0].match_count, 1);
     }
 
@@ -619,13 +671,13 @@ mod tests {
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params.insert("effect[0][matchCount]".to_string(), vec!["2".to_string()]);
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert_eq!(req.filters.effects[0].match_count, 2);
 
         let mut params3: QueryMultiMap = HashMap::new();
         params3.insert("effect[0][t]".to_string(), vec!["24".to_string()]);
         params3.insert("effect[0][matchCount]".to_string(), vec!["3".to_string()]);
-        let req3 = parse_request(state.index().as_ref(), &params3).unwrap();
+        let req3 = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params3).unwrap();
         assert_eq!(req3.filters.effects[0].match_count, 3);
     }
 
@@ -634,7 +686,7 @@ mod tests {
         let state = test_state();
         let mut params: QueryMultiMap = HashMap::new();
         params.insert("effect[0][x]".to_string(), vec!["24".to_string()]);
-        let err = parse_request(state.index().as_ref(), &params).unwrap_err();
+        let err = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap_err();
         assert_eq!(err.0, StatusCode::BAD_REQUEST);
     }
     #[test]
@@ -642,12 +694,107 @@ mod tests {
         let state = test_state();
         let mut enabled: QueryMultiMap = HashMap::new();
         enabled.insert("debug_bga_trigram".to_string(), vec![String::new()]);
-        let req = parse_request(state.index().as_ref(), &enabled).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &enabled).unwrap();
         assert!(req.debug_bga_trigram);
 
         let params: QueryMultiMap = HashMap::new();
-        let req = parse_request(state.index().as_ref(), &params).unwrap();
+        let req = parse_request(state.index().as_ref(), state.formats().as_ref(), false, &params).unwrap();
         assert!(!req.debug_bga_trigram);
+    }
+
+    fn sample_format_index(id: &str, status: FormatLoadStatus) -> FormatIndex {
+        FormatIndex {
+            by_id: BTreeMap::from([(
+                id.to_string(),
+                LoadedFormat {
+                    id: id.to_string(),
+                    status,
+                },
+            )]),
+            manifest_versions: BTreeMap::from([(id.to_string(), 1)]),
+        }
+    }
+
+    #[test]
+    fn parse_format_last_value_wins() {
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert(
+            "format".to_string(),
+            vec!["first".to_string(), "second".to_string()],
+        );
+        assert_eq!(parse_format(&params).as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn format_unknown_when_disabled_returns_400() {
+        let state = test_state();
+        let formats = sample_format_index("std", FormatLoadStatus::Failed);
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("format".to_string(), vec!["std".to_string()]);
+        let err = parse_request(
+            state.index().as_ref(),
+            &formats,
+            false,
+            &params,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert_eq!(err.1.0.error, "unknown format 'std'");
+    }
+
+    #[test]
+    fn format_unknown_when_enabled_but_missing_returns_400() {
+        let state = test_state();
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("format".to_string(), vec!["missing".to_string()]);
+        let err = parse_request(
+            state.index().as_ref(),
+            state.formats().as_ref(),
+            true,
+            &params,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert_eq!(err.1.0.error, "unknown format 'missing'");
+    }
+
+    #[test]
+    fn format_failed_returns_500() {
+        let state = test_state();
+        let formats = sample_format_index("broken", FormatLoadStatus::Failed);
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("format".to_string(), vec!["broken".to_string()]);
+        let err = parse_request(
+            state.index().as_ref(),
+            &formats,
+            true,
+            &params,
+        )
+        .unwrap_err();
+        assert_eq!(err.0, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.1.0.error, "format failed to load");
+    }
+
+    #[test]
+    fn format_ready_when_enabled_succeeds() {
+        let state = test_state();
+        let formats = sample_format_index(
+            "std",
+            FormatLoadStatus::Ready {
+                negated: false,
+                bitmap: RoaringBitmap::new(),
+            },
+        );
+        let mut params: QueryMultiMap = HashMap::new();
+        params.insert("format".to_string(), vec!["std".to_string()]);
+        let req = parse_request(
+            state.index().as_ref(),
+            &formats,
+            true,
+            &params,
+        )
+        .unwrap();
+        assert_eq!(req.format.as_deref(), Some("std"));
     }
 }
 

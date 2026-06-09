@@ -7,3 +7,11 @@ path = "./build/full_index.tar.zst"
 
 [index.reload]
 enabled = false
+
+# Optional format filters (omit entire [formats] section to disable)
+# [formats]
+# reload_interval_secs = 60
+#
+# [formats.source]
+# type = "disk"
+# path = "./uniques-http-api/formats"

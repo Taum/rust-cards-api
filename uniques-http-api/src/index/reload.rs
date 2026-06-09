@@ -6,6 +6,7 @@ mod tick;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::config::Settings;
 use crate::http::state::AppState;
 use tokio::time::MissedTickBehavior;
 
@@ -37,6 +38,7 @@ impl IndexSource for AnyIndexSource {
 
 pub fn spawn_hot_reload(
     state: Arc<AppState>,
+    settings: Arc<Settings>,
     source: impl IndexSource + 'static,
     interval_secs: u64,
 ) {
@@ -47,7 +49,7 @@ pub fn spawn_hot_reload(
 
         loop {
             interval.tick().await;
-            if let Err(e) = tick::reload_tick(&state, &source).await {
+            if let Err(e) = tick::reload_tick(&state, &settings, &source).await {
                 eprintln!("index hot-reload tick failed: {e:#}");
             }
         }

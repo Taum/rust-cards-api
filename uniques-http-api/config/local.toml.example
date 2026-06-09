@@ -1,2 +1,11 @@
 [server]
 port = 8234
+
+# Enable the sample format (50 random cards from ALL_SETS; seed=42).
+# Requires index loaded from build/full_index/ALL_SETS (or equivalent merged index).
+[formats]
+reload_interval_secs = 0
+
+[formats.source]
+type = "disk"
+path = "./build/formats"

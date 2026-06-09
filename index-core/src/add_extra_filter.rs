@@ -3,13 +3,10 @@ use crate::extra_catalog::{
     bitmap_file_for_id, ExtraCatalog, ExtraCatalogEntry, ExtraFilterType, EXTRA_CATALOG_FILE,
     EXTRA_DIR,
 };
-use crate::path::parse_card_reference;
+use crate::refs_bitmap::{build_bitmap_from_refs_file, validate_bitmap_span};
 use anyhow::{bail, Context, Result};
-use roaring::RoaringBitmap;
 use serde::Deserialize;
-use std::collections::BTreeSet;
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
@@ -58,7 +55,7 @@ pub fn add_extra_filter(opts: &AddExtraFilterOptions) -> Result<AddExtraFilterSu
         );
     }
 
-    let (refs_read, bitmap) = build_bitmap_from_refs(&opts.refs_file, &catalog)?;
+    let (refs_read, bitmap) = build_bitmap_from_refs_file(&opts.refs_file, &catalog)?;
     validate_bitmap_span(&bitmap, manifest.total_bit_span)?;
     let card_count = bitmap.len();
     let extra_dir = opts.index_dir.join(EXTRA_DIR);
@@ -153,56 +150,3 @@ fn validate_filter_id(filter_id: &str) -> Result<()> {
     Ok(())
 }
 
-fn build_bitmap_from_refs(refs_file: &Path, catalog: &Catalog) -> Result<(usize, RoaringBitmap)> {
-    let file = fs::File::open(refs_file)
-        .with_context(|| format!("open refs file {}", refs_file.display()))?;
-    let reader = BufReader::new(file);
-
-    let mut refs_read = 0usize;
-    let mut bits = BTreeSet::new();
-
-    for (line_no, line) in reader.lines().enumerate() {
-        let line = line.with_context(|| {
-            format!("read line {} of {}", line_no + 1, refs_file.display())
-        })?;
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        refs_read += 1;
-        let parsed = parse_card_reference(trimmed).with_context(|| {
-            format!(
-                "line {} of {}: invalid reference {:?}",
-                line_no + 1,
-                refs_file.display(),
-                trimmed
-            )
-        })?;
-        let bit = catalog.lookup_bit(&parsed).with_context(|| {
-            format!(
-                "line {} of {}: reference not in catalog: {}",
-                line_no + 1,
-                refs_file.display(),
-                trimmed
-            )
-        })?;
-        bits.insert(bit);
-    }
-
-    let mut bitmap = RoaringBitmap::new();
-    for bit in bits {
-        bitmap.insert(bit);
-    }
-    Ok((refs_read, bitmap))
-}
-
-fn validate_bitmap_span(bitmap: &RoaringBitmap, total_bit_span: u32) -> Result<()> {
-    if let Some(max_bit) = bitmap.iter().max() {
-        if max_bit >= total_bit_span {
-            bail!(
-                "bitmap contains card_index {max_bit} outside manifest total_bit_span {total_bit_span}"
-            );
-        }
-    }
-    Ok(())
-}

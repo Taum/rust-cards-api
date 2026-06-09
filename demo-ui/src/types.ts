@@ -50,6 +50,7 @@ export type FilterState = {
   sets: string[];
   reference: string;
   name: string;
+  format: string;
   handCost: string;
   reserveCost: string;
   limit: string;
@@ -82,6 +83,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   sets: [],
   reference: '',
   name: '',
+  format: '',
   handCost: '',
   reserveCost: '',
   limit: '',

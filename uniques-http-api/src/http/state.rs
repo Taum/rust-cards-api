@@ -1,45 +1,108 @@
 use std::sync::{Arc, RwLock};
 
+use crate::config::Settings;
+use crate::formats::FormatIndex;
 use crate::index::UniquesIndex;
 
-/// Axum shared state; holds the loaded index and will gain HTTP-layer fields over time.
+#[derive(Clone)]
+pub struct ServerState {
+    pub app: Arc<AppState>,
+    pub settings: Arc<Settings>,
+}
+
+#[derive(Clone)]
+pub struct QuerySnapshot {
+    pub index: Arc<UniquesIndex>,
+    pub formats: Arc<FormatIndex>,
+}
+
+/// Axum shared state; holds the loaded index and format filters.
 pub struct AppState {
-    index: RwLock<Arc<UniquesIndex>>,
+    query: RwLock<Arc<QuerySnapshot>>,
 }
 
 impl AppState {
-    pub(crate) fn new(index: UniquesIndex) -> Self {
+    pub(crate) fn new(snapshot: QuerySnapshot) -> Self {
         Self {
-            index: RwLock::new(Arc::new(index)),
+            query: RwLock::new(Arc::new(snapshot)),
         }
     }
 
-    pub fn index(&self) -> Arc<UniquesIndex> {
-        self.index
+    /// Build state with an index and empty format catalog (tests / formats disabled).
+    pub(crate) fn new_with_index(index: UniquesIndex) -> Self {
+        Self::new(QuerySnapshot {
+            index: Arc::new(index),
+            formats: Arc::new(FormatIndex::empty()),
+        })
+    }
+
+    pub fn snapshot(&self) -> Arc<QuerySnapshot> {
+        self.query
             .read()
-            .expect("index lock poisoned")
+            .expect("query lock poisoned")
             .clone()
     }
 
-    pub fn current_built_at_secs(&self) -> u64 {
-        self.index
-            .read()
-            .expect("index lock poisoned")
-            .manifest
-            .built_at_secs
+    pub fn index(&self) -> Arc<UniquesIndex> {
+        Arc::clone(&self.snapshot().index)
     }
 
-    /// Swap only if `new` has a strictly higher `built_at_secs`.
-    /// Returns `Some((old_secs, new_secs))` when swapped, `None` if skipped.
-    pub(crate) fn swap_if_newer(&self, new: Arc<UniquesIndex>) -> Option<(u64, u64)> {
-        let mut guard = self.index.write().expect("index lock poisoned");
-        let old_secs = guard.manifest.built_at_secs;
-        let new_secs = new.manifest.built_at_secs;
+    pub fn formats(&self) -> Arc<FormatIndex> {
+        Arc::clone(&self.snapshot().formats)
+    }
+
+    pub fn current_built_at_secs(&self) -> u64 {
+        self.snapshot().index.manifest.built_at_secs
+    }
+
+    pub(crate) fn commit(&self, snapshot: Arc<QuerySnapshot>) {
+        *self.query.write().expect("query lock poisoned") = snapshot;
+    }
+
+    /// Swap index+formats when the new index has a strictly higher `built_at_secs`.
+    pub(crate) fn commit_if_newer(
+        &self,
+        new_index: Arc<UniquesIndex>,
+        new_formats: Arc<FormatIndex>,
+    ) -> Option<(u64, u64)> {
+        let current = self.snapshot();
+        let old_secs = current.index.manifest.built_at_secs;
+        let new_secs = new_index.manifest.built_at_secs;
         if new_secs > old_secs {
-            *guard = new;
+            self.commit(Arc::new(QuerySnapshot {
+                index: new_index,
+                formats: new_formats,
+            }));
             Some((old_secs, new_secs))
         } else {
             None
+        }
+    }
+}
+
+impl ServerState {
+    /// Wrap loaded app state with minimal settings for integration tests (formats disabled).
+    pub fn for_test(app: AppState) -> Self {
+        use crate::config::{
+            IndexSettings, IndexSourceKind, ObjectStoreSettings, ReloadSettings, ServerSettings,
+            Settings,
+        };
+
+        Self {
+            app: Arc::new(app),
+            settings: Arc::new(Settings {
+                server: ServerSettings { port: 8080 },
+                index: IndexSettings {
+                    source: IndexSourceKind::Disk,
+                    path: None,
+                    reload: ReloadSettings {
+                        enabled: false,
+                        interval_secs: None,
+                    },
+                    object_store: ObjectStoreSettings::default(),
+                },
+                formats: None,
+            }),
         }
     }
 }
@@ -54,13 +117,14 @@ mod tests {
     use index_core::catalog::Catalog;
     use index_core::idgd_catalog::IdGdCatalog;
 
+    use crate::formats::FormatIndex;
     use crate::index::loader::{
         build_family_lookup_index, build_name_search_index, FactionsSummary, IndexManifest,
         StatsSummary,
     };
     use crate::index::UniquesIndex;
 
-    use super::AppState;
+    use super::{AppState, QuerySnapshot};
 
     fn minimal_index(built_at_secs: u64) -> UniquesIndex {
         let catalog = Catalog {
@@ -117,19 +181,41 @@ mod tests {
         }
     }
 
+    fn snapshot_with_index(built_at_secs: u64) -> QuerySnapshot {
+        QuerySnapshot {
+            index: Arc::new(minimal_index(built_at_secs)),
+            formats: Arc::new(FormatIndex::empty()),
+        }
+    }
+
     #[test]
-    fn swap_if_newer_replaces_when_strictly_newer() {
-        let state = AppState::new(minimal_index(10));
-        let swapped = state.swap_if_newer(Arc::new(minimal_index(20)));
+    fn commit_if_newer_replaces_when_strictly_newer() {
+        let state = AppState::new(snapshot_with_index(10));
+        let swapped = state.commit_if_newer(
+            Arc::new(minimal_index(20)),
+            Arc::new(FormatIndex::empty()),
+        );
         assert_eq!(swapped, Some((10, 20)));
         assert_eq!(state.current_built_at_secs(), 20);
     }
 
     #[test]
-    fn swap_if_newer_skips_when_equal_or_older() {
-        let state = AppState::new(minimal_index(20));
-        assert_eq!(state.swap_if_newer(Arc::new(minimal_index(20))), None);
-        assert_eq!(state.swap_if_newer(Arc::new(minimal_index(10))), None);
+    fn commit_if_newer_skips_when_equal_or_older() {
+        let state = AppState::new(snapshot_with_index(20));
+        assert_eq!(
+            state.commit_if_newer(
+                Arc::new(minimal_index(20)),
+                Arc::new(FormatIndex::empty()),
+            ),
+            None
+        );
+        assert_eq!(
+            state.commit_if_newer(
+                Arc::new(minimal_index(10)),
+                Arc::new(FormatIndex::empty()),
+            ),
+            None
+        );
         assert_eq!(state.current_built_at_secs(), 20);
     }
 }

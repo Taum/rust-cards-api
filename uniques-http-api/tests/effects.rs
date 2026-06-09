@@ -1,22 +1,21 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use axum::body::Body;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uniques_http_api::{app, load_index};
+use uniques_http_api::{app, load_index, ServerState};
 
 const FIXTURE_INDEX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal_index");
 
-fn test_state() -> Arc<uniques_http_api::AppState> {
-    Arc::new(
+fn test_server() -> ServerState {
+    ServerState::for_test(
         load_index(Path::new(FIXTURE_INDEX)).expect("load minimal test index"),
     )
 }
 
 #[tokio::test]
 async fn effects_returns_memoized_catalog_json() {
-    let response = app(test_state())
+    let response = app(test_server())
         .oneshot(
             axum::http::Request::builder()
                 .uri("/api/v2/effects")
@@ -43,6 +42,6 @@ async fn effects_returns_memoized_catalog_json() {
     assert_eq!(value["output"][0]["idGd"], 3);
 
     // Same bytes as startup memoization (stable across requests).
-    let state = test_state();
-    assert_eq!(body.as_ref(), state.index().effects_body().as_ref());
+    let server = test_server();
+    assert_eq!(body.as_ref(), server.app.index().effects_body().as_ref());
 }

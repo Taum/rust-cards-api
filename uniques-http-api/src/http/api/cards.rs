@@ -5,15 +5,13 @@ pub(crate) mod test_support;
 
 pub(crate) mod parse;
 
-use std::sync::Arc;
-
 use axum::Router;
 
-use crate::http::state::AppState;
+use crate::http::ServerState;
 
 pub use models::{CardV2, CardsIter, CardsResponse};
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router() -> Router<ServerState> {
     use axum::routing::get;
 
     Router::new()

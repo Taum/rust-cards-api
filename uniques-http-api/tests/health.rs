@@ -1,22 +1,21 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use axum::body::Body;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uniques_http_api::{app, load_index};
+use uniques_http_api::{app, load_index, ServerState};
 
 const FIXTURE_INDEX: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal_index");
 
-fn test_state() -> Arc<uniques_http_api::AppState> {
-    Arc::new(
+fn test_server() -> ServerState {
+    ServerState::for_test(
         load_index(Path::new(FIXTURE_INDEX)).expect("load minimal test index"),
     )
 }
 
 #[tokio::test]
 async fn health_returns_hello_world_json() {
-    let response = app(test_state())
+    let response = app(test_server())
         .oneshot(
             axum::http::Request::builder()
                 .uri("/healthz")
@@ -37,7 +36,7 @@ async fn health_returns_hello_world_json() {
 
 #[tokio::test]
 async fn cors_allows_any_origin() {
-    let response = app(test_state())
+    let response = app(test_server())
         .oneshot(
             axum::http::Request::builder()
                 .uri("/healthz")

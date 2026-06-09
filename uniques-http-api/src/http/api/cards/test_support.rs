@@ -240,7 +240,7 @@ pub(crate) fn test_state() -> AppState {
         family_span_groups,
     };
 
-    AppState::new(index)
+    AppState::new_with_index(index)
 }
 
 fn family_entry(
@@ -336,5 +336,5 @@ pub(crate) fn test_state_with_sets() -> AppState {
         family_span_groups,
     };
 
-    AppState::new(index)
+    AppState::new_with_index(index)
 }

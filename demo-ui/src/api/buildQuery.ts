@@ -128,6 +128,11 @@ function appendFilterParams(
     params.set('name', name);
   }
 
+  const format = state.format.trim();
+  if (format) {
+    params.set('format', format);
+  }
+
   if (state.handCost.trim()) {
     const parsed = parseCostInput(state.handCost);
     if (!parsed.ok) {

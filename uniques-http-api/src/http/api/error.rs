@@ -32,3 +32,12 @@ pub(crate) fn not_found(message: impl Into<String>) -> (StatusCode, Json<ApiErro
 pub(crate) fn map_query_error(err: QueryError) -> (StatusCode, Json<ApiError>) {
     bad_request(err.message())
 }
+
+pub(crate) fn internal_server_error(message: impl Into<String>) -> (StatusCode, Json<ApiError>) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ApiError {
+            error: message.into(),
+        }),
+    )
+}
