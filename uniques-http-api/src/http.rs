@@ -10,9 +10,10 @@ pub use extract::IndexSnapshot;
 pub use state::{AppState, QuerySnapshot, ServerState};
 
 pub fn app(server: ServerState) -> Router {
+    let collections = server.settings.collections.clone();
     Router::new()
         .merge(admin::router())
-        .merge(api::router())
+        .merge(api::router(&collections))
         .layer(CorsLayer::permissive())
         .with_state(server)
 }

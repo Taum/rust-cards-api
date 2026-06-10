@@ -9,6 +9,31 @@ pub struct Settings {
     pub index: IndexSettings,
     #[serde(default)]
     pub formats: Option<FormatsSettings>,
+    #[serde(default)]
+    pub collections: CollectionsSettings,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CollectionsSettings {
+    pub max_memory_bytes: u64,
+    #[serde(default)]
+    pub time_to_live_secs: u64,
+    #[serde(default)]
+    pub time_to_idle_secs: u64,
+    /// Max POST body size for `POST /api/v2/collection/{id}`; `0` keeps Axum's default (2 MiB).
+    #[serde(default)]
+    pub max_post_payload_bytes: u64,
+}
+
+impl Default for CollectionsSettings {
+    fn default() -> Self {
+        Self {
+            max_memory_bytes: 32 * 1024 * 1024,
+            time_to_live_secs: 0,
+            time_to_idle_secs: 0,
+            max_post_payload_bytes: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -190,6 +215,25 @@ fn validate_settings(settings: &Settings) -> Result<()> {
         if formats.reload_interval_secs > 0 && !formats.is_enabled() {
             bail!("formats.reload_interval_secs requires formats.source.path to be set");
         }
+    }
+    validate_collections(&settings.collections)?;
+    Ok(())
+}
+
+const MAX_COLLECTION_EXPIRY_SECS: u64 = 10 * 365 * 24 * 60 * 60;
+
+fn validate_collections(collections: &CollectionsSettings) -> Result<()> {
+    if collections.max_memory_bytes == 0 {
+        bail!("collections.max_memory_bytes must be greater than 0");
+    }
+    if collections.time_to_live_secs > MAX_COLLECTION_EXPIRY_SECS {
+        bail!("collections.time_to_live_secs is too large");
+    }
+    if collections.time_to_idle_secs > MAX_COLLECTION_EXPIRY_SECS {
+        bail!("collections.time_to_idle_secs is too large");
+    }
+    if collections.max_post_payload_bytes > usize::MAX as u64 {
+        bail!("collections.max_post_payload_bytes exceeds platform usize::MAX");
     }
     Ok(())
 }

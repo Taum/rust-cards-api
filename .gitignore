@@ -17,3 +17,4 @@ cli-indexer/tmp-scripts
 uniques-http-api/.env
 uniques-http-api/.env.local
 uniques-http-api/config/local.toml
+tmp

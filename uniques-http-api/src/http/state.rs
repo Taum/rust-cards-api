@@ -1,6 +1,7 @@
 use std::sync::{Arc, RwLock};
 
-use crate::config::Settings;
+use crate::collections::CollectionStore;
+use crate::config::{CollectionsSettings, Settings};
 use crate::formats::FormatIndex;
 use crate::index::UniquesIndex;
 
@@ -14,9 +15,10 @@ pub struct ServerState {
 pub struct QuerySnapshot {
     pub index: Arc<UniquesIndex>,
     pub formats: Arc<FormatIndex>,
+    pub collections: CollectionStore,
 }
 
-/// Axum shared state; holds the loaded index and format filters.
+/// Axum shared state; holds the loaded index, format filters, and collections.
 pub struct AppState {
     query: RwLock<Arc<QuerySnapshot>>,
 }
@@ -30,9 +32,17 @@ impl AppState {
 
     /// Build state with an index and empty format catalog (tests / formats disabled).
     pub(crate) fn new_with_index(index: UniquesIndex) -> Self {
+        Self::new_with_index_and_settings(index, &CollectionsSettings::default())
+    }
+
+    pub(crate) fn new_with_index_and_settings(
+        index: UniquesIndex,
+        collections_settings: &CollectionsSettings,
+    ) -> Self {
         Self::new(QuerySnapshot {
             index: Arc::new(index),
             formats: Arc::new(FormatIndex::empty()),
+            collections: CollectionStore::new(collections_settings),
         })
     }
 
@@ -60,10 +70,12 @@ impl AppState {
     }
 
     /// Swap index+formats when the new index has a strictly higher `built_at_secs`.
+    /// Collections are discarded as incompatible with the new index layout.
     pub(crate) fn commit_if_newer(
         &self,
         new_index: Arc<UniquesIndex>,
         new_formats: Arc<FormatIndex>,
+        collections_settings: &CollectionsSettings,
     ) -> Option<(u64, u64)> {
         let current = self.snapshot();
         let old_secs = current.index.manifest.built_at_secs;
@@ -72,6 +84,7 @@ impl AppState {
             self.commit(Arc::new(QuerySnapshot {
                 index: new_index,
                 formats: new_formats,
+                collections: CollectionStore::new(collections_settings),
             }));
             Some((old_secs, new_secs))
         } else {
@@ -84,8 +97,8 @@ impl ServerState {
     /// Wrap loaded app state with minimal settings for integration tests (formats disabled).
     pub fn for_test(app: AppState) -> Self {
         use crate::config::{
-            IndexSettings, IndexSourceKind, ObjectStoreSettings, ReloadSettings, ServerSettings,
-            Settings,
+            CollectionsSettings, IndexSettings, IndexSourceKind, ObjectStoreSettings,
+            ReloadSettings, ServerSettings, Settings,
         };
 
         Self {
@@ -102,6 +115,10 @@ impl ServerState {
                     object_store: ObjectStoreSettings::default(),
                 },
                 formats: None,
+                collections: CollectionsSettings {
+                    max_memory_bytes: 1024 * 1024,
+                    ..CollectionsSettings::default()
+                },
             }),
         }
     }
@@ -117,6 +134,8 @@ mod tests {
     use index_core::catalog::Catalog;
     use index_core::idgd_catalog::IdGdCatalog;
 
+    use crate::collections::CollectionStore;
+    use crate::config::CollectionsSettings;
     use crate::formats::FormatIndex;
     use crate::index::loader::{
         build_family_lookup_index, build_name_search_index, FactionsSummary, IndexManifest,
@@ -125,6 +144,13 @@ mod tests {
     use crate::index::UniquesIndex;
 
     use super::{AppState, QuerySnapshot};
+
+    fn test_collections_settings() -> CollectionsSettings {
+        CollectionsSettings {
+            max_memory_bytes: 1024 * 1024,
+            ..CollectionsSettings::default()
+        }
+    }
 
     fn minimal_index(built_at_secs: u64) -> UniquesIndex {
         let catalog = Catalog {
@@ -185,15 +211,18 @@ mod tests {
         QuerySnapshot {
             index: Arc::new(minimal_index(built_at_secs)),
             formats: Arc::new(FormatIndex::empty()),
+            collections: CollectionStore::new(&test_collections_settings()),
         }
     }
 
     #[test]
     fn commit_if_newer_replaces_when_strictly_newer() {
+        let settings = test_collections_settings();
         let state = AppState::new(snapshot_with_index(10));
         let swapped = state.commit_if_newer(
             Arc::new(minimal_index(20)),
             Arc::new(FormatIndex::empty()),
+            &settings,
         );
         assert_eq!(swapped, Some((10, 20)));
         assert_eq!(state.current_built_at_secs(), 20);
@@ -201,11 +230,13 @@ mod tests {
 
     #[test]
     fn commit_if_newer_skips_when_equal_or_older() {
+        let settings = test_collections_settings();
         let state = AppState::new(snapshot_with_index(20));
         assert_eq!(
             state.commit_if_newer(
                 Arc::new(minimal_index(20)),
                 Arc::new(FormatIndex::empty()),
+                &settings,
             ),
             None
         );
@@ -213,9 +244,33 @@ mod tests {
             state.commit_if_newer(
                 Arc::new(minimal_index(10)),
                 Arc::new(FormatIndex::empty()),
+                &settings,
             ),
             None
         );
         assert_eq!(state.current_built_at_secs(), 20);
+    }
+
+    #[test]
+    fn commit_if_newer_discards_collections() {
+        use roaring::RoaringBitmap;
+
+        let settings = test_collections_settings();
+        let state = AppState::new(snapshot_with_index(10));
+        state
+            .snapshot()
+            .collections
+            .insert("deck", Arc::new(RoaringBitmap::from_iter([1])));
+        assert!(state.snapshot().collections.contains("deck"));
+
+        state
+            .commit_if_newer(
+                Arc::new(minimal_index(20)),
+                Arc::new(FormatIndex::empty()),
+                &settings,
+            )
+            .expect("swapped");
+
+        assert!(!state.snapshot().collections.contains("deck"));
     }
 }

@@ -24,6 +24,7 @@ config = { version = "0.14", features = ["toml"] }
 object_store = { version = "0.12", features = ["gcp"] }
 sha2 = "0.10"
 bytes = "1"
+mini-moka = "0.10"
 
 [dev-dependencies]
 testcontainers = "0.23"

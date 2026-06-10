@@ -51,6 +51,7 @@ export type FilterState = {
   reference: string;
   name: string;
   format: string;
+  collection: string;
   handCost: string;
   reserveCost: string;
   limit: string;
@@ -84,6 +85,7 @@ export const DEFAULT_FILTER_STATE: FilterState = {
   reference: '',
   name: '',
   format: '',
+  collection: '',
   handCost: '',
   reserveCost: '',
   limit: '',

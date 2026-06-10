@@ -52,7 +52,8 @@ pub async fn get_effects_filtered(
     let (part, region) = parse_editing(editing)?;
 
     // Full current filter state (validates idGd types, including the edited group).
-    let req = parse_request(index, formats, formats_enabled, &params)?;
+    let collections = &snapshot.collections;
+    let req = parse_request(index, formats, formats_enabled, collections, &params)?;
 
     // Co-constraints = the edited group's other two boxes (the edited part is ignored).
     let (co1, co2) = match region {
@@ -78,7 +79,7 @@ pub async fn get_effects_filtered(
             base_req.filters.support_o.clear();
         }
     }
-    let base = build_bitmap(index, formats, &base_req)
+    let base = build_bitmap(index, formats, collections, &base_req)
         .map_err(crate::http::api::error::map_query_error)?;
 
     let lines: &[EffectLine] = match region {

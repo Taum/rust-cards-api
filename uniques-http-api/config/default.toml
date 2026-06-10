@@ -8,6 +8,16 @@ path = "./build/full_index.tar.zst"
 [index.reload]
 enabled = false
 
+[collections]
+# Cache maximum size (32 MiB)
+max_memory_bytes = 32_000_000
+# Time before cleaning collection after initial POST -- 0 = no limit
+time_to_live_secs = 0
+# Time before cleaning collection after last access -- 0 = no limit
+time_to_idle_secs = 0
+# Maximum size to POST /api/v2/collection/{id} -- 0 = keep 2MiB default
+max_post_payload_bytes = 0
+
 # Optional format filters (omit entire [formats] section to disable)
 # [formats]
 # reload_interval_secs = 60

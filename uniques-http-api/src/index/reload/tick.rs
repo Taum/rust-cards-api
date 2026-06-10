@@ -35,7 +35,7 @@ pub(super) async fn reload_tick(
 
     let elapsed = started.elapsed();
 
-    match state.commit_if_newer(new_index, new_formats) {
+    match state.commit_if_newer(new_index, new_formats, &settings.collections) {
         Some((old_secs, new_secs)) => {
             eprintln!(
                 "index hot-reloaded: version {old_secs} -> {new_secs} (loaded in {:.2}s)",

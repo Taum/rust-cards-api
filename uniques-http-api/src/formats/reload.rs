@@ -53,6 +53,7 @@ async fn formats_reload_tick(state: &Arc<AppState>, settings: &Settings) -> anyh
     let snapshot = QuerySnapshot {
         index: Arc::clone(&current.index),
         formats: Arc::new(new_formats),
+        collections: current.collections.clone(),
     };
     state.commit(Arc::new(snapshot));
     eprintln!("formats hot-reloaded");

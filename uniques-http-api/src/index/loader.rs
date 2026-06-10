@@ -14,6 +14,7 @@ use roaring::RoaringBitmap;
 use serde::Deserialize;
 use unicode_normalization::UnicodeNormalization;
 
+use crate::collections::CollectionStore;
 use crate::config::Settings;
 use crate::formats::{load_format_index, FormatIndex};
 use crate::http::api::effects::{build_effects_list, serialize_effects_list};
@@ -27,7 +28,7 @@ pub mod storage;
 
 pub use archive::TarZstIndexStorage;
 pub use disk::DiskIndexStorage;
-pub use object_store::{load_app_state_from_object_store, load_index_from_object_store, load_uniques_index_from_object_store, ObjectStoreIndexClient};
+pub use object_store::{load_app_state_from_object_store, load_index_from_object_store, ObjectStoreIndexClient};
 pub use storage::IndexStorage;
 
 use storage::{read_json, read_roar, read_roar_id_gd};
@@ -460,6 +461,7 @@ pub fn build_app_state(index: UniquesIndex, settings: &Settings) -> AppState {
     AppState::new(QuerySnapshot {
         index: Arc::new(index),
         formats,
+        collections: CollectionStore::new(&settings.collections),
     })
 }
 

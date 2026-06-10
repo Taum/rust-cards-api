@@ -203,20 +203,33 @@ export function FilterPanel({
       </section>
 
       <section className="space-y-2">
-        <label className="block text-sm text-slate-300">
-          Format
-          <input
-            type="text"
-            value={filters.format}
-            onChange={(e) => setFilters({ format: e.target.value })}
-            placeholder="sample-50"
-            className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-          />
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm text-slate-300">
+            Format
+            <input
+              type="text"
+              value={filters.format}
+              onChange={(e) => setFilters({ format: e.target.value })}
+              placeholder="sample-50"
+              className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+          <label className="block text-sm text-slate-300">
+            Collection
+            <input
+              type="text"
+              value={filters.collection}
+              onChange={(e) => setFilters({ collection: e.target.value })}
+              placeholder="sample-1k"
+              className="mt-1 w-full rounded border border-slate-600 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
+            />
+          </label>
+        </div>
         <p className="text-xs text-slate-500">
-          Sent as{' '}
-          <code className="font-mono text-slate-400">format=…</code> on card
-          searches (requires formats enabled on the API).
+          Sent as <code className="font-mono text-slate-400">format=…</code> or{' '}
+          <code className="font-mono text-slate-400">collection=…</code> on card
+          searches. Format requires formats enabled on the API; collection must be
+          loaded via <code className="font-mono text-slate-400">POST /api/v2/collection/…</code>.
         </p>
       </section>
 

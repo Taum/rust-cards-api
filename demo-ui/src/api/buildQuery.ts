@@ -133,6 +133,11 @@ function appendFilterParams(
     params.set('format', format);
   }
 
+  const collection = state.collection.trim();
+  if (collection) {
+    params.set('collection', collection);
+  }
+
   if (state.handCost.trim()) {
     const parsed = parseCostInput(state.handCost);
     if (!parsed.ok) {

@@ -172,4 +172,5 @@ pub struct CardsRequest {
     pub debug_bga_trigram: bool,
     pub with_families: bool,
     pub format: Option<String>,
+    pub collection: Option<String>,
 }

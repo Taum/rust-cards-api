@@ -70,6 +70,16 @@ query id="24":
 get-refid id="ALT_COREKS_B_AX_04_U_10":
     cargo run -p cli-indexer --release -- query --index-dir build/full_index --set ALL_SETS --refid {{id}}
 
+# Try pushing a collection to the API
+[group('3-manual-test'), windows]
+push-collection id="coll-test-1k" collection="uniques-http-api/tests/fixtures/collection/random-1000.txt":
+    curl.exe -v -X POST --data-binary "@{{collection}}" http://localhost:8234/api/v2/collection/{{id}}
+
+# Try pushing a collection to the API
+[group('3-manual-test'), unix]
+push-collection id="coll-test-1k" collection="uniques-http-api/tests/fixtures/collection/random-1000.txt":
+    curl -v -X POST --data-binary "@{{collection}}" http://localhost:8234/api/v2/collection/{{id}}
+
 # Build the index for a single set
 [group('4-production')]
 create-index set="COREKS" root_dir="../equinox-cards":

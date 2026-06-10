@@ -4,7 +4,7 @@ mod reload;
 pub mod uniques_index;
 
 pub use loader::{
-    build_app_state, load_app_state, load_app_state_from_object_store, load_index,
+    load_app_state, load_app_state_from_object_store, load_index,
     load_index_from_object_store, ObjectStoreIndexClient,
 };
 pub use reload::{spawn_hot_reload, AnyIndexSource, DiskIndexSource, RemoteIndexSource};

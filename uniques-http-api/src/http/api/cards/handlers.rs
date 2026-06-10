@@ -58,8 +58,9 @@ pub async fn get_cards_v2(
         .formats
         .as_ref()
         .is_some_and(|f| f.is_enabled());
-    let req = parse_request(index, formats, formats_enabled, &params)?;
-    let bitmap = build_bitmap(index, formats, &req).map_err(map_query_error)?;
+    let collections = &snapshot.collections;
+    let req = parse_request(index, formats, formats_enabled, collections, &params)?;
+    let bitmap = build_bitmap(index, formats, collections, &req).map_err(map_query_error)?;
     let total = bitmap.len() as u64;
 
     let (cards, next_cursor, families) = if req.with_families && req.cursor.is_none() {

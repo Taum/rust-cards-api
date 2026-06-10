@@ -1,11 +1,14 @@
+mod collections;
 mod config;
 mod env;
 mod formats;
 mod http;
 mod index;
 
+pub use collections::CollectionStore;
 pub use config::{
-    load_settings, FormatsSettings, FormatsSourceConfig, IndexSourceKind, Settings,
+    load_settings, CollectionsSettings, FormatsSettings, FormatsSourceConfig, IndexSourceKind,
+    Settings,
 };
 pub use env::load_env;
 pub use formats::{load_format_index, spawn_formats_hot_reload, FormatIndex, FormatLoadStatus};
