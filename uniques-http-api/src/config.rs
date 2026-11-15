@@ -11,6 +11,8 @@ pub struct Settings {
     pub formats: Option<FormatsSettings>,
     #[serde(default)]
     pub collections: CollectionsSettings,
+    #[serde(default)]
+    pub cards: CardsSettings,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -37,6 +39,22 @@ impl Default for CollectionsSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct CardsSettings {
+    /// Max POST body size for `POST /api/v2/cards` (same params as `GET`, carried in the body);
+    /// `0` keeps Axum's default (2 MiB). See `uniques-http-api/plans/25-post-cards-endpoint.md`.
+    #[serde(default)]
+    pub max_post_payload_bytes: u64,
+}
+
+impl Default for CardsSettings {
+    fn default() -> Self {
+        Self {
+            max_post_payload_bytes: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ServerSettings {
     pub port: u16,
 }
@@ -49,6 +67,8 @@ pub struct IndexSettings {
     pub reload: ReloadSettings,
     #[serde(default)]
     pub object_store: ObjectStoreSettings,
+    #[serde(default)]
+    pub http: HttpIndexSettings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -57,6 +77,7 @@ pub enum IndexSourceKind {
     Disk,
     Archive,
     ObjectStore,
+    Http,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -93,6 +114,14 @@ pub struct ObjectStoreSettings {
     pub url: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct HttpIndexSettings {
+    /// Direct, unauthenticated URL to a `full_index.tar.zst` archive (e.g. a
+    /// public object storage URL). Fetched with a plain GET, no cloud SDK.
+    #[serde(default)]
+    pub url: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct FormatsSettings {
     pub source: FormatsSourceConfig,
@@ -104,12 +133,14 @@ pub struct FormatsSettings {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FormatsSourceConfig {
     Disk { path: String },
+    Http { manifest_url: String },
 }
 
 impl FormatsSettings {
     pub fn is_enabled(&self) -> bool {
         match &self.source {
             FormatsSourceConfig::Disk { path } => !path.trim().is_empty(),
+            FormatsSourceConfig::Http { manifest_url } => !manifest_url.trim().is_empty(),
         }
     }
 
@@ -135,6 +166,14 @@ impl Settings {
         let url = self.index.object_store.url.trim();
         if url.is_empty() {
             bail!("index.object_store.url must be set when index.source = object_store");
+        }
+        Ok(url)
+    }
+
+    pub fn http_index_url(&self) -> Result<&str> {
+        let url = self.index.http.url.trim();
+        if url.is_empty() {
+            bail!("index.http.url must be set when index.source = http");
         }
         Ok(url)
     }
@@ -206,6 +245,12 @@ fn validate_settings(settings: &Settings) -> Result<()> {
         IndexSourceKind::ObjectStore => {
             settings.object_store_url()?;
         }
+        IndexSourceKind::Http => {
+            settings.http_index_url()?;
+            if settings.index.reload.enabled {
+                bail!("index.reload is not supported yet for index.source = http");
+            }
+        }
         IndexSourceKind::Disk | IndexSourceKind::Archive => {
             settings.index_path()?;
         }
@@ -217,6 +262,7 @@ fn validate_settings(settings: &Settings) -> Result<()> {
         }
     }
     validate_collections(&settings.collections)?;
+    validate_cards(&settings.cards)?;
     Ok(())
 }
 
@@ -234,6 +280,13 @@ fn validate_collections(collections: &CollectionsSettings) -> Result<()> {
     }
     if collections.max_post_payload_bytes > usize::MAX as u64 {
         bail!("collections.max_post_payload_bytes exceeds platform usize::MAX");
+    }
+    Ok(())
+}
+
+fn validate_cards(cards: &CardsSettings) -> Result<()> {
+    if cards.max_post_payload_bytes > usize::MAX as u64 {
+        bail!("cards.max_post_payload_bytes exceeds platform usize::MAX");
     }
     Ok(())
 }
@@ -273,6 +326,74 @@ mod tests {
             .unwrap();
         assert_eq!(settings.index.source, IndexSourceKind::Disk);
         validate_settings(&settings).expect("disk config validates without object_store");
+    }
+
+    fn http_index_toml(reload_enabled: bool) -> String {
+        format!(
+            r#"
+            [server]
+            port = 3000
+
+            [index]
+            source = "http"
+
+            [index.http]
+            url = "https://example.com/full_index.tar.zst"
+
+            [index.reload]
+            enabled = {reload_enabled}
+            "#
+        )
+    }
+
+    #[test]
+    fn http_source_requires_url() {
+        let toml = r#"
+            [server]
+            port = 3000
+
+            [index]
+            source = "http"
+
+            [index.reload]
+            enabled = false
+        "#;
+        let settings: Settings = config::Config::builder()
+            .add_source(config::File::from_str(toml, config::FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+        assert_eq!(settings.index.source, IndexSourceKind::Http);
+        assert!(validate_settings(&settings).is_err());
+    }
+
+    #[test]
+    fn http_source_validates_with_url_set() {
+        let toml = http_index_toml(false);
+        let settings: Settings = config::Config::builder()
+            .add_source(config::File::from_str(&toml, config::FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+        assert_eq!(
+            settings.http_index_url().unwrap(),
+            "https://example.com/full_index.tar.zst"
+        );
+        validate_settings(&settings).expect("http config validates with url set");
+    }
+
+    #[test]
+    fn http_source_rejects_reload_enabled() {
+        let toml = http_index_toml(true);
+        let settings: Settings = config::Config::builder()
+            .add_source(config::File::from_str(&toml, config::FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
+        assert!(validate_settings(&settings).is_err());
     }
 
     #[test]

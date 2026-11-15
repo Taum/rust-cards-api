@@ -73,8 +73,19 @@ pub fn load_single_format(
 ) -> Result<(bool, RoaringBitmap)> {
     let text = std::fs::read_to_string(file_path)
         .map_err(|e| anyhow!("read {}: {e}", file_path.display()))?;
-    let def: FormatDefinition = serde_json::from_str(&text)
-        .map_err(|e| anyhow!("parse {}: {e}", file_path.display()))?;
+    load_single_format_from_text(index, entry, &text, &file_path.display().to_string())
+}
+
+/// Same as [`load_single_format`], but for a format already fetched into memory
+/// (e.g. downloaded over HTTP). `label` is used in error messages in place of a file path.
+pub fn load_single_format_from_text(
+    index: &UniquesIndex,
+    entry: &FormatsManifestEntry,
+    text: &str,
+    label: &str,
+) -> Result<(bool, RoaringBitmap)> {
+    let def: FormatDefinition =
+        serde_json::from_str(text).map_err(|e| anyhow!("parse {label}: {e}"))?;
     def.cross_check_manifest(entry).map_err(|e| anyhow!(e))?;
     def.mode().map_err(|e| anyhow!(e))?;
     build_format_bitmap(index, &def)
@@ -89,10 +100,12 @@ mod tests {
     use axum::body::Bytes;
     use index_core::catalog::{Catalog, FamilyEntry, FamilySet};
     use index_core::idgd_catalog::IdGdCatalog;
+    use index_core::idgd_collapse::IdGdAliasMap;
 
     use crate::index::loader::{
-        build_family_lookup_index, build_family_span_groups, build_name_search_index,
-        build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS,
+        build_collector_number_lookup_index, build_family_lookup_index, build_family_span_groups,
+        build_name_search_index, build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary,
+        SET_CORE, SET_COREKS,
     };
     use crate::index::UniquesIndex;
 
@@ -120,6 +133,8 @@ mod tests {
                         name: String::new(),
                         code: None,
                     },
+                    card_family_id: None,
+                    collector_family_number: None,
                 },
                 FamilyEntry {
                     start_bit: 5,
@@ -138,6 +153,8 @@ mod tests {
                         name: String::new(),
                         code: None,
                     },
+                    card_family_id: None,
+                    collector_family_number: None,
                 },
             ],
             total_bit_span: 8,
@@ -160,6 +177,7 @@ mod tests {
                 set: "TEST".to_string(),
                 entries: vec![],
             },
+            id_gd_aliases: IdGdAliasMap::default(),
             stats_summary: StatsSummary {
                 version: 1,
                 set: "TEST".to_string(),
@@ -181,9 +199,14 @@ mod tests {
             stats: BTreeMap::new(),
             factions: BTreeMap::new(),
             set_bitmaps,
+            subtype_bitmaps: BTreeMap::new(),
+            banned: RoaringBitmap::new(),
+            errated: RoaringBitmap::new(),
+            suspended: RoaringBitmap::new(),
             name_search_index: build_name_search_index(&catalog),
             family_lookup_index: build_family_lookup_index(&catalog),
             family_span_groups: build_family_span_groups(&catalog),
+            collector_number_lookup_index: build_collector_number_lookup_index(&catalog),
             effects_body: Arc::new(Bytes::from_static(b"[]")),
         }
     }

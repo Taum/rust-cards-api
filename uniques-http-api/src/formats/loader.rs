@@ -6,9 +6,9 @@ use roaring::RoaringBitmap;
 use crate::config::FormatsSettings;
 use crate::index::UniquesIndex;
 
-use super::build::load_single_format;
+use super::build::{load_single_format, load_single_format_from_text};
 use super::schema::{FormatsManifestEntry, MANIFEST_FILE};
-use super::source::FormatsSource;
+use super::source::{FormatsSource, HttpFormatsSource};
 
 #[derive(Debug, Clone)]
 pub enum FormatLoadStatus {
@@ -48,22 +48,31 @@ struct LoadedEntryResult {
 }
 
 pub fn load_format_index(index: &UniquesIndex, settings: &FormatsSettings) -> FormatIndex {
-    let source = FormatsSource::from_config(&settings.source);
+    load_format_index_from_source(index, &FormatsSource::from_config(&settings.source))
+}
+
+fn load_format_index_from_source(index: &UniquesIndex, source: &FormatsSource) -> FormatIndex {
     match source {
         FormatsSource::Disk(disk) => load_format_index_from_root(index, disk.root()),
+        FormatsSource::Http(http) => load_format_index_from_http(index, http),
     }
 }
 
-pub fn read_manifest_versions(root: &Path) -> Option<BTreeMap<String, u64>> {
+pub fn read_manifest_versions(source: &FormatsSource) -> Option<BTreeMap<String, u64>> {
+    let entries = match source {
+        FormatsSource::Disk(disk) => read_manifest_entries_from_disk(disk.root())?,
+        FormatsSource::Http(http) => {
+            let client = http_client().ok()?;
+            fetch_manifest(&client, http.manifest_url()).ok()?
+        }
+    };
+    Some(entries.into_iter().map(|e| (e.id, e.version)).collect())
+}
+
+fn read_manifest_entries_from_disk(root: &Path) -> Option<Vec<FormatsManifestEntry>> {
     let manifest_path = root.join(MANIFEST_FILE);
     let text = std::fs::read_to_string(&manifest_path).ok()?;
-    let entries: Vec<FormatsManifestEntry> = serde_json::from_str(&text).ok()?;
-    Some(
-        entries
-            .into_iter()
-            .map(|e| (e.id.clone(), e.version))
-            .collect(),
-    )
+    serde_json::from_str(&text).ok()
 }
 
 fn load_format_index_from_root(index: &UniquesIndex, root: &Path) -> FormatIndex {
@@ -98,6 +107,78 @@ fn load_format_index_from_root(index: &UniquesIndex, root: &Path) -> FormatIndex
                     let file_path = root.join(&entry.path);
                     let outcome = load_single_format(index, &entry, &file_path)
                         .map_err(|e| e.to_string());
+                    LoadedEntryResult {
+                        id: entry.id,
+                        version: entry.version,
+                        outcome,
+                    }
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|h| h.join().expect("format load thread panicked"))
+            .collect()
+    });
+
+    merge_loaded_results(results)
+}
+
+const HTTP_TIMEOUT_SECS: u64 = 30;
+
+fn http_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| format!("build http client: {e}"))
+}
+
+fn fetch_text(client: &reqwest::blocking::Client, url: &str) -> Result<String, String> {
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|e| format!("fetch {url}: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("fetch {url}: {e}"))?;
+    response.text().map_err(|e| format!("read body {url}: {e}"))
+}
+
+fn fetch_manifest(
+    client: &reqwest::blocking::Client,
+    url: &str,
+) -> Result<Vec<FormatsManifestEntry>, String> {
+    let text = fetch_text(client, url)?;
+    serde_json::from_str(&text).map_err(|e| format!("parse {url}: {e}"))
+}
+
+fn load_format_index_from_http(index: &UniquesIndex, http: &HttpFormatsSource) -> FormatIndex {
+    let client = match http_client() {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("formats: {e}");
+            return FormatIndex::empty();
+        }
+    };
+
+    let entries = match fetch_manifest(&client, http.manifest_url()) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("formats: failed to load manifest from {}: {e}", http.manifest_url());
+            return FormatIndex::empty();
+        }
+    };
+
+    let results: Vec<LoadedEntryResult> = std::thread::scope(|s| {
+        entries
+            .iter()
+            .map(|entry| {
+                let entry = entry.clone();
+                let client = client.clone();
+                let url = http.file_url(&entry.path);
+                s.spawn(move || {
+                    let outcome = fetch_text(&client, &url).and_then(|text| {
+                        load_single_format_from_text(index, &entry, &text, &url)
+                            .map_err(|e| e.to_string())
+                    });
                     LoadedEntryResult {
                         id: entry.id,
                         version: entry.version,
@@ -175,11 +256,13 @@ mod tests {
     use axum::body::Bytes;
     use index_core::catalog::{Catalog, FamilyEntry, FamilySet};
     use index_core::idgd_catalog::IdGdCatalog;
+    use index_core::idgd_collapse::IdGdAliasMap;
 
     use crate::config::{FormatsSettings, FormatsSourceConfig};
     use crate::index::loader::{
-        build_family_lookup_index, build_family_span_groups, build_name_search_index,
-        build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE,
+        build_collector_number_lookup_index, build_family_lookup_index, build_family_span_groups,
+        build_name_search_index, build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary,
+        SET_CORE,
     };
     use crate::index::UniquesIndex;
 
@@ -206,6 +289,8 @@ mod tests {
                     name: String::new(),
                     code: None,
                 },
+                card_family_id: None,
+                collector_family_number: None,
             }],
             total_bit_span: 2,
         };
@@ -227,6 +312,7 @@ mod tests {
                 set: "TEST".to_string(),
                 entries: vec![],
             },
+            id_gd_aliases: IdGdAliasMap::default(),
             stats_summary: StatsSummary {
                 version: 1,
                 set: "TEST".to_string(),
@@ -248,9 +334,14 @@ mod tests {
             stats: BTreeMap::new(),
             factions: BTreeMap::new(),
             set_bitmaps,
+            subtype_bitmaps: BTreeMap::new(),
+            banned: RoaringBitmap::new(),
+            errated: RoaringBitmap::new(),
+            suspended: RoaringBitmap::new(),
             name_search_index: build_name_search_index(&catalog),
             family_lookup_index: build_family_lookup_index(&catalog),
             family_span_groups: build_family_span_groups(&catalog),
+            collector_number_lookup_index: build_collector_number_lookup_index(&catalog),
             effects_body: Arc::new(Bytes::from_static(b"[]")),
         }
     }

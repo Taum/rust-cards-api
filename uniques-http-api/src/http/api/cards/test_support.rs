@@ -9,14 +9,16 @@ use index_core::catalog::{Catalog, FamilyCardSubType, FamilyEntry, FamilySet, FA
 use index_core::compact::{encode_record, CompactCardFields, RECORD_SIZE};
 use index_core::faction_index::Faction;
 use index_core::idgd_catalog::{IdGdCatalog, IdGdCatalogEntry};
+use index_core::idgd_collapse::IdGdAliasMap;
 use index_core::stat_index::StatField;
 use roaring::RoaringBitmap;
 
 use crate::http::state::AppState;
 use crate::index::UniquesIndex;
 use crate::index::loader::{
-    build_family_lookup_index, build_family_span_groups, build_name_search_index,
-    build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary, SET_CORE, SET_COREKS,
+    build_collector_number_lookup_index, build_family_lookup_index, build_family_span_groups,
+    build_name_search_index, build_set_bitmaps, FactionsSummary, IndexManifest, StatsSummary,
+    SET_CORE, SET_COREKS,
 };
 
 pub(crate) fn test_state() -> AppState {
@@ -46,6 +48,8 @@ pub(crate) fn test_state() -> AppState {
                 name: "Test Set".to_string(),
                 code: Some("BTG".to_string()),
             },
+            card_family_id: Some(1),
+            collector_family_number: Some("011".to_string()),
         }],
         total_bit_span: 10,
     };
@@ -77,6 +81,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: true,
                 is_echo: false,
+                duplicated_id_gd: Vec::new(),
             },
             IdGdCatalogEntry {
                 id_gd: 191,
@@ -91,6 +96,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: true,
                 is_echo: false,
+                duplicated_id_gd: Vec::new(),
             },
             IdGdCatalogEntry {
                 id_gd: 42,
@@ -105,6 +111,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: false,
                 is_echo: true,
+                duplicated_id_gd: Vec::new(),
             },
             IdGdCatalogEntry {
                 id_gd: 90,
@@ -119,6 +126,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: true,
                 is_echo: false,
+                duplicated_id_gd: Vec::new(),
             },
             IdGdCatalogEntry {
                 id_gd: 25,
@@ -133,6 +141,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: true,
                 is_echo: false,
+                duplicated_id_gd: Vec::new(),
             },
             IdGdCatalogEntry {
                 id_gd: 192,
@@ -147,6 +156,7 @@ pub(crate) fn test_state() -> AppState {
                 ec: None,
                 is_main: true,
                 is_echo: false,
+                duplicated_id_gd: Vec::new(),
             },
         ],
     };
@@ -202,12 +212,16 @@ pub(crate) fn test_state() -> AppState {
     let name_search_index = build_name_search_index(&catalog);
     let family_lookup_index = build_family_lookup_index(&catalog);
     let family_span_groups = build_family_span_groups(&catalog);
+    let collector_number_lookup_index = build_collector_number_lookup_index(&catalog);
+
+    let id_gd_aliases = IdGdAliasMap::from_catalog(&idgd_catalog);
 
     let index = UniquesIndex {
         index_dir: "C:\\tmp\\index".into(),
         catalog,
         manifest,
         idgd_catalog,
+        id_gd_aliases,
         effects_body,
         stats_summary,
         factions_summary,
@@ -226,6 +240,22 @@ pub(crate) fn test_state() -> AppState {
             recall_cost[3] = RoaringBitmap::from_iter([5]);
             stats.insert(StatField::RecallCost, recall_cost);
 
+            let mut forest_power: [RoaringBitmap; 16] =
+                std::array::from_fn(|_| RoaringBitmap::new());
+            forest_power[1] = RoaringBitmap::from_iter([2]);
+            forest_power[4] = RoaringBitmap::from_iter([5]);
+            stats.insert(StatField::ForestPower, forest_power);
+
+            let mut mountain_power: [RoaringBitmap; 16] =
+                std::array::from_fn(|_| RoaringBitmap::new());
+            mountain_power[2] = RoaringBitmap::from_iter([2, 5]);
+            stats.insert(StatField::MountainPower, mountain_power);
+
+            let mut ocean_power: [RoaringBitmap; 16] =
+                std::array::from_fn(|_| RoaringBitmap::new());
+            ocean_power[0] = RoaringBitmap::from_iter([2, 5]);
+            stats.insert(StatField::OceanPower, ocean_power);
+
             stats
         },
         factions: {
@@ -235,9 +265,14 @@ pub(crate) fn test_state() -> AppState {
             factions
         },
         set_bitmaps,
+        subtype_bitmaps: BTreeMap::new(),
+        banned: RoaringBitmap::new(),
+        errated: RoaringBitmap::new(),
+        suspended: RoaringBitmap::new(),
         name_search_index,
         family_lookup_index,
         family_span_groups,
+        collector_number_lookup_index,
     };
 
     AppState::new_with_index(index)
@@ -266,6 +301,8 @@ fn family_entry(
             name: source_set.to_string(),
             code: None,
         },
+        card_family_id: None,
+        collector_family_number: None,
     }
 }
 
@@ -296,6 +333,7 @@ pub(crate) fn test_state_with_sets() -> AppState {
     let name_search_index = build_name_search_index(&catalog);
     let family_lookup_index = build_family_lookup_index(&catalog);
     let family_span_groups = build_family_span_groups(&catalog);
+    let collector_number_lookup_index = build_collector_number_lookup_index(&catalog);
     assert!(set_bitmaps.by_set.contains_key(SET_CORE));
     assert!(set_bitmaps.by_set.contains_key(SET_COREKS));
     assert!(set_bitmaps.by_set.contains_key("ALIZE"));
@@ -309,6 +347,7 @@ pub(crate) fn test_state_with_sets() -> AppState {
             set: "ALL_SETS".to_string(),
             entries: vec![],
         },
+        id_gd_aliases: IdGdAliasMap::default(),
         effects_body: Arc::new(Bytes::from_static(b"{}")),
         stats_summary: StatsSummary {
             version: 1,
@@ -331,9 +370,14 @@ pub(crate) fn test_state_with_sets() -> AppState {
         stats: BTreeMap::new(),
         factions: BTreeMap::new(),
         set_bitmaps,
+        subtype_bitmaps: BTreeMap::new(),
+        banned: RoaringBitmap::new(),
+        errated: RoaringBitmap::new(),
+        suspended: RoaringBitmap::new(),
         name_search_index,
         family_lookup_index,
         family_span_groups,
+        collector_number_lookup_index,
     };
 
     AppState::new_with_index(index)

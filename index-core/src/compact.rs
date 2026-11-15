@@ -31,6 +31,19 @@ pub fn faction_code_from_reference(reference: &str) -> u8 {
     }
 }
 
+/// Inverse of [`faction_code_from_reference`].
+pub fn faction_reference_from_code(code: u8) -> Option<&'static str> {
+    match code {
+        1 => Some("AX"),
+        2 => Some("BR"),
+        3 => Some("LY"),
+        4 => Some("MU"),
+        5 => Some("OR"),
+        6 => Some("YZ"),
+        _ => None,
+    }
+}
+
 /// Extract compact fields from an already-parsed card.
 pub fn compact_fields_from_card(card: &CardJson) -> CompactCardFields {
     // Faction: mainFaction.reference only (not path faction).
@@ -168,6 +181,50 @@ fn set_group_from_effect(slot: &mut [u16; 3], effect: &CardEffect) {
 }
 
 // --- Binary encoding / writing ---
+
+pub fn decode_record(buf: &[u8; RECORD_SIZE]) -> CompactCardFields {
+    let read_u16 = |idx: usize| -> u16 {
+        let base = 6 + idx * 2;
+        u16::from_le_bytes([buf[base], buf[base + 1]])
+    };
+
+    CompactCardFields {
+        faction_code: buf[0],
+        main_cost: buf[1],
+        recall_cost: buf[2],
+        mountain_power: buf[3],
+        ocean_power: buf[4],
+        forest_power: buf[5],
+        main_effect: [
+            [read_u16(0), read_u16(1), read_u16(2)],
+            [read_u16(3), read_u16(4), read_u16(5)],
+            [read_u16(6), read_u16(7), read_u16(8)],
+        ],
+        echo_effect: [read_u16(9), read_u16(10), read_u16(11)],
+    }
+}
+
+pub fn remap_id_gd_fields(fields: &mut CompactCardFields, remap: &std::collections::BTreeMap<u32, u32>) {
+    if remap.is_empty() {
+        return;
+    }
+    let remap_one = |id: u16| -> u16 {
+        if id == 0 {
+            return 0;
+        }
+        let u = id as u32;
+        remap.get(&u).copied().unwrap_or(u) as u16
+    };
+
+    for group in &mut fields.main_effect {
+        for slot in group.iter_mut() {
+            *slot = remap_one(*slot);
+        }
+    }
+    for slot in &mut fields.echo_effect {
+        *slot = remap_one(*slot);
+    }
+}
 
 pub fn encode_record(fields: &CompactCardFields) -> [u8; RECORD_SIZE] {
     let mut buf = [0u8; RECORD_SIZE];

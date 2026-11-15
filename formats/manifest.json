@@ -1,0 +1,14 @@
+[
+  {
+    "id": "frontier",
+	"name": "Frontier",
+    "path": "frontier.json",
+    "version": 1
+  },
+  {
+    "id": "living-legend",
+	"name": "Living Legend",
+    "path": "living-legend.json",
+    "version": 1
+  }
+]
